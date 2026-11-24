@@ -1,0 +1,40 @@
+---
+description: Nordwind invoice cash-flow task – company data, requirements, constraints
+alwaysApply: true
+---
+
+# Project context (FELADAT.md)
+
+Cash-flow kimutatás PDF számlákból, Dockerben futtatható webapp. Részletek: `FELADAT.md`.
+
+## Mi cégünk (irány eldöntése)
+
+- Név: **Nordwind Solutions Kft.**
+- Cím: Infopark sétány 7., 1117 Budapest
+- Adószám: `26481937-2-43` | EU VAT: `HU26481937`
+- **Kimenő:** mi vagyunk a kiállító. **Bejövő:** mi vagyunk a vevő.
+- **Partner:** a másik fél; cégenkénti összesítésnél adószám alapján egyoszloposíts (névváltozatok ellen).
+
+## Kötelező kinyert mezők
+
+Számlaszám; kiállító/vevő név+adószám; kiállítás dátuma; **teljesítés dátuma** (MNB nap); **fizetési határidő** (diagram); pénznem; **bruttó** végösszeg; irány; partner.
+
+## MNB
+
+- Teljesítés napjának árfolyama; ha nincs jegyzés → utolsó megelőző.
+- SOAP: POST **http** (nem https) `http://www.mnb.hu/arfolyamok.asmx`; árfolyamokat cache-eld.
+- Kerekítés: számlánként egész HUF (0,5↑), utána aggregálás.
+
+## UI sorrend
+
+1) Havi vonaldiagram (bejövő/kimenő, due date, üres hónap = 0)  
+2) Partner táblázat (Össz bejövő / Össz kimenő)  
+3) Számlalista (eredeti + árfolyam + HUF)
+
+## Kemény szabályok
+
+- Ne építs fájlnevekre; ne hardcode-old a 100 PDF-re.
+- Duplikátum: kiállító + számlaszám → ne duplázd.
+- Egy fájl hibája ne állítsa le a többit.
+- OpenRouter kulcs **csak** az app LLM hívásaira (nem fejlesztésre); env-ből, ne a gitbe.
+- Kis, beszédes commitok; dokumentáld `AI_NAPLO.md` + README.

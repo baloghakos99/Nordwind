@@ -1,0 +1,15 @@
+---
+description: MNB árfolyam – SOAP, teljesítés nap, cache, kerekítés
+alwaysApply: true
+---
+
+# MNB FX
+
+- Endpoint: `http://www.mnb.hu/arfolyamok.asmx` — **http**, nem https (https → 404).
+- Művelet: `GetExchangeRates` (`startDate`, `endDate`, `currencyNames`).
+- Rate nap = számla **teljesítés** dátuma; ha nincs jegyzés (hétvége/ünnep) → utolsó **on-or-before**.
+- Válasz: nested escaped XML; tizedes **vessző**; figyeld a `unit`-ot (ne feltételezd, hogy 1).
+- Cache: `(currency, rate_date)` — ugyanazt ne kérdezd le újra.
+- HUF: rate 1, nincs SOAP hívás.
+- Kerekítés: számlánként egész HUF, half-up (0,5-től felfelé); aggregálás utána.
+- Due date ≠ fulfillment — a diagram due date havi bontást használ, az FX a teljesítést.

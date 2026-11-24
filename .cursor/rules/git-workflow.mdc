@@ -1,0 +1,12 @@
+---
+description: Git habit – small commits; commit only when asked
+alwaysApply: true
+---
+
+# Git workflow
+
+- A kiértékelés a **git history**-t is nézi: kisebb, beszédes commitok (nem egy „final” commit).
+- **Ne commitolj**, amíg a felhasználó kifejezetten nem kéri.
+- Commit üzenet: *miért* történt a változás (pl. „MNB árfolyam cache”, „duplikátum-azonosítás”), ne csak „update”.
+- Ne commitolj titkokat (`.env`, kulcsok).
+- Ha a felhasználó commitot kér: staged diff + log alapján, a repo stílusához igazodva.

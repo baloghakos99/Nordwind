@@ -1,0 +1,41 @@
+---
+description: Log marked agent prompts into AI_NAPLO.md (@napló / @naplo)
+alwaysApply: true
+---
+
+# AI journal – marked prompts
+
+Ha a felhasználó üzenetében szerepel a **`@napló`** vagy **`@naplo`** jelölő:
+
+1. A válasz **elején** (vagy a kért munka elvégzése után, de ugyanabban a körben) appendeld a bejegyzést az `AI_NAPLO.md` fájl **végére**.
+2. Ne írd felül a meglévő bejegyzéseket; csak toldalékolj.
+3. Távolítsd el a jelölőt a naplóba írt szövegből (a jelölő meta, nem tartalom).
+
+## Bejegyzés formátum
+
+```markdown
+---
+
+## YYYY-MM-DD HH:MM – rövid cím (1 sor)
+
+### Prompt
+> A felhasználó utasítása idézve / összefoglalva (a lényeg maradjon meg; hosszú kódblokkokat rövidítsd `[…]`-nel).
+
+### Agent válasz / döntés
+- Mit csináltál / mit javasoltál.
+- Mit fogadtál el vagy vetettél el (ha releváns), és miért.
+- Ha hibát találtál vagy javítottál: hogyan vetted észre.
+
+### Érintett fájlok
+- `út/fájl` – röviden mi változott (ha volt változás)
+```
+
+## Mikor NE naplózz
+
+- Nincs `@napló` / `@naplo` a promptban.
+- Tisztán technikai „folytasd” / „ok” üzenetek jelölő nélkül.
+- Ne naplózz titkokat (API kulcs, `.env` értékek) – helyettesítsd `[REDACTED]`-del.
+
+## Megjegyzés
+
+A napló a FELADAT 7. pontjának része: a meghatározó lépések és promptok legyenek visszakereshetők.
