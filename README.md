@@ -60,7 +60,7 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
      1. JSON parse + kötelező kulcsok (`assertLlmJsonShape`)
      2. normalizálás után ugyanaz a `validateExtraction` quality gate, mint a rulesnál
      3. forrásszöveg cross-check: számlaszám / pénznem / bruttó összeg megjelenik-e a PDF szövegben (`crossCheckLlmAgainstSource`)
-     - Nincs tételsor-kinyerés, ezért nincs „sorok összege = végösszeg” ellenőrzés; helyette a fenti mező+forrás egyezés.
+     4. soft check: ha az LLM ad `line_item_amounts` (≥1 tétel), `sum(tételek) + vat_amount` ≈ `gross_amount` (tol: max 1 / 1%); `vat_amount` = külön ÁFA összesen, ha van; üres tömb → skip
      - Bármelyik fail → `error`, nem kerül a kimutatásba.
 
 ### MNB árfolyam (Phase 4)
@@ -74,5 +74,18 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 
 - `GET /api/report` — havi sorozat (due date), partner mátrix (adószám), forintosított számlák.
 - UI sorrend: diagram → cégenkénti tábla → számlalista (SQLite-ból, frissítés után is megmarad).
+
+## Ismert korlátok
+
+- Nincs OCR: csak szöveges PDF-ből nyerünk ki; szkennelt / kép alapú számla nem megy.
+- Nincs rules-alapú tételsor-parse / UI tétellista; a sorösszeg↔végösszeg csak LLM soft check (`line_item_amounts` + opcionális `vat_amount`).
+- A szabályalapú kinyerés sablon- / nyelvfüggő; teljesen új layoutnál gyakran LLM kell.
+- Partner szűrés csak a kliens oldalon (nagy listánál tovább finomítható).
+
+## Továbbfejlesztési ötletek
+
+- Új, ismétlődő számlafajtánál: az LLM eredményből semi-automatikus rules-javaslat (label / dátum / parser), emberi jóváhagyással — a következő ugyanolyan layout már rules-szel megy, az OpenRouter költség csökken.
+- OCR / image PDF támogatás.
+- Finomabb progress / retry UI hibás számlákra.
 
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.

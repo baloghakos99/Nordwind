@@ -10,7 +10,7 @@ import type { FxConversionResult } from '../types/mnb.js';
 import { getProcessConcurrency, mapPool } from '../util/concurrency.js';
 import { extractInvoiceFromText } from './extractInvoice.js';
 import { extractInvoiceWithLlm, isLlmConfigured } from './llmExtract.js';
-import { crossCheckLlmAgainstSource } from './llmValidate.js';
+import { checkLineItemsSumGross, crossCheckLlmAgainstSource } from './llmValidate.js';
 import { extractPdfText } from './pdfText.js';
 import { validateExtraction } from './validate.js';
 
@@ -274,6 +274,8 @@ export async function processInvoiceById(id: number): Promise<ProcessResult> {
 
     let llmFields: ExtractedInvoiceFields;
     let llmModel: string;
+    let lineItemAmounts: number[] = [];
+    let vatAmount = 0;
     try {
       const llm = await extractInvoiceWithLlm(text, {
         partial: ruleFields,
@@ -281,6 +283,8 @@ export async function processInvoiceById(id: number): Promise<ProcessResult> {
       });
       llmFields = llm.fields;
       llmModel = llm.model;
+      lineItemAmounts = llm.lineItemAmounts;
+      vatAmount = llm.vatAmount;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       persistFields(
@@ -295,10 +299,16 @@ export async function processInvoiceById(id: number): Promise<ProcessResult> {
 
     const llmValidation = validateExtraction(llmFields);
     const crossErrors = crossCheckLlmAgainstSource(llmFields, text);
-    if (!llmValidation.ok || crossErrors.length) {
+    const lineSumErrors = checkLineItemsSumGross(
+      lineItemAmounts,
+      llmFields.gross_amount,
+      vatAmount,
+    );
+    const llmGateErrors = [...crossErrors, ...lineSumErrors];
+    if (!llmValidation.ok || llmGateErrors.length) {
       const detail = [
         ...llmValidation.errors,
-        ...crossErrors,
+        ...llmGateErrors,
       ].join('; ');
       persistFields(
         id,
@@ -314,7 +324,7 @@ export async function processInvoiceById(id: number): Promise<ProcessResult> {
         validation: {
           ...llmValidation,
           ok: false,
-          errors: [...llmValidation.errors, ...crossErrors],
+          errors: [...llmValidation.errors, ...llmGateErrors],
         },
         extraction_method: 'llm',
       };

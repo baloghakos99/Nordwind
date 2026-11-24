@@ -2,7 +2,7 @@ import type { ExtractedInvoiceFields } from '../types/invoice.js';
 import { NORDWIND } from './nordwind.js';
 import { parseAmount } from './parseAmount.js';
 import { parseDate } from './parseDate.js';
-import { assertLlmJsonShape } from './llmValidate.js';
+import { assertLlmJsonShape, parseLineItemAmounts, parseVatAmount } from './llmValidate.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -31,7 +31,11 @@ Dates must be YYYY-MM-DD. currency one of HUF,EUR,USD,GBP,PLN.
 gross_amount is the payable GROSS total (not net, not VAT), as a number.
 Keys: invoice_number, issuer_name, issuer_tax_id, buyer_name, buyer_tax_id,
 issue_date, fulfillment_date, due_date, currency, gross_amount, direction,
-partner_name, partner_tax_id. Use null if unknown.`;
+partner_name, partner_tax_id. Use null if unknown.
+Optional soft-check fields:
+- line_item_amounts: array of line amounts as printed (often NET row totals). Do not invent.
+- vat_amount: total VAT if listed separately (e.g. ÁFA összesen / VAT total). Use null/0 if lines are already gross or VAT is not a separate total.
+Check: sum(line_item_amounts) + vat_amount ≈ gross_amount. Prefer the stated VAT total over recomputing from %.`;
 
 function buildUserPrompt(
   text: string,
@@ -94,6 +98,10 @@ export interface LlmExtractResult {
   fields: ExtractedInvoiceFields;
   model: string;
   nordwindHint: string;
+  /** Line amounts as printed (often net); empty = soft check skipped. */
+  lineItemAmounts: number[];
+  /** Separate VAT total when listed (0 if none / lines already gross). */
+  vatAmount: number;
 }
 
 export interface LlmExtractOptions {
@@ -159,6 +167,10 @@ export async function extractInvoiceWithLlm(
   const fields = normalizeLlmFields(parsed);
   if (!fields) throw new Error('OpenRouter returned empty fields');
 
+  const rawObj = parsed as Record<string, unknown>;
+  const lineItemAmounts = parseLineItemAmounts(rawObj.line_item_amounts);
+  const vatAmount = parseVatAmount(rawObj.vat_amount);
+
   // Ensure partner if direction known
   if (!fields.partner_name && fields.direction === 'incoming') {
     fields.partner_name = fields.issuer_name;
@@ -169,5 +181,5 @@ export async function extractInvoiceWithLlm(
     fields.partner_tax_id = fields.partner_tax_id || fields.buyer_tax_id;
   }
 
-  return { fields, model, nordwindHint: NORDWIND.euVat };
+  return { fields, model, nordwindHint: NORDWIND.euVat, lineItemAmounts, vatAmount };
 }

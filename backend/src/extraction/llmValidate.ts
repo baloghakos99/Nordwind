@@ -42,6 +42,72 @@ export function assertLlmJsonShape(raw: unknown): asserts raw is Record<string, 
   ) {
     throw new Error(`LLM direction invalid: ${String(o.direction)}`);
   }
+  // Optional soft-check fields — not required
+  if ('line_item_amounts' in o && o.line_item_amounts != null) {
+    if (!Array.isArray(o.line_item_amounts)) {
+      throw new Error('LLM line_item_amounts must be an array or null');
+    }
+    for (const item of o.line_item_amounts) {
+      if (typeof item !== 'number' && typeof item !== 'string') {
+        throw new Error('LLM line_item_amounts entries must be number or string');
+      }
+    }
+  }
+  if ('vat_amount' in o && o.vat_amount != null
+    && typeof o.vat_amount !== 'number' && typeof o.vat_amount !== 'string') {
+    throw new Error('LLM vat_amount must be number, string, or null');
+  }
+}
+
+function parseOptionalPositiveNumber(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) return raw;
+  if (typeof raw === 'string') {
+    const t = raw.trim().replace(/\s/g, '').replace(',', '.');
+    const parsed = Number(t);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
+/**
+ * Parse optional LLM `line_item_amounts` into finite numbers.
+ * Missing / null / non-array → empty (soft check skipped).
+ */
+export function parseLineItemAmounts(raw: unknown): number[] {
+  if (raw == null || !Array.isArray(raw)) return [];
+  const out: number[] = [];
+  for (const item of raw) {
+    const n = parseOptionalPositiveNumber(item);
+    if (n != null && n > 0) out.push(n);
+  }
+  return out;
+}
+
+/** Optional total VAT (ÁFA összesen). Missing / invalid → 0 for the soft check. */
+export function parseVatAmount(raw: unknown): number {
+  return parseOptionalPositiveNumber(raw) ?? 0;
+}
+
+/**
+ * Soft check: if ≥1 line amounts, sum(lines) + vat ≈ gross (tol = max(1, 1% of gross)).
+ * Lines are often NET; vat_amount is the separate VAT total when listed.
+ * Empty / missing amounts or missing gross → skip (no errors).
+ */
+export function checkLineItemsSumGross(
+  lineAmounts: number[] | null | undefined,
+  grossAmount: number | null | undefined,
+  vatAmount: number | null | undefined = 0,
+): string[] {
+  if (!lineAmounts || lineAmounts.length === 0) return [];
+  if (grossAmount == null || !(grossAmount > 0) || !Number.isFinite(grossAmount)) return [];
+  const vat = vatAmount != null && Number.isFinite(vatAmount) && vatAmount > 0 ? vatAmount : 0;
+  const sum = lineAmounts.reduce((a, b) => a + b, 0) + vat;
+  const tol = Math.max(1, 0.01 * Math.abs(grossAmount));
+  if (Math.abs(sum - grossAmount) <= tol) return [];
+  return [
+    `LLM line_item_amounts+vat ${sum} ≠ gross_amount ${grossAmount} (lines+vat, tol ${tol})`,
+  ];
 }
 
 function compactAlnum(s: string): string {
@@ -65,7 +131,7 @@ export function amountAppearsInText(amount: number, sourceText: string): boolean
 
 /**
  * Cross-check normalized LLM fields against PDF text.
- * We do not extract line items — instead verify key claims appear in the source.
+ * Header claims must appear in the source; optional line-item sum is separate.
  * Returns error messages (empty = ok).
  */
 export function crossCheckLlmAgainstSource(
