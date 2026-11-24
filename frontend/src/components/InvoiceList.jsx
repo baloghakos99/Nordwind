@@ -15,14 +15,14 @@ const METHOD_LABEL = {
   llm: 'LLM',
 };
 
-function formatAmount(inv) {
-  if (inv.gross_amount == null) return '—';
-  const n = Number(inv.gross_amount);
+function formatMoney(amount, currency, fractionDigits) {
+  if (amount == null) return '—';
+  const n = Number(amount);
   const formatted = new Intl.NumberFormat('hu-HU', {
-    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits ?? (n % 1 === 0 ? 0 : 2),
+    maximumFractionDigits: fractionDigits ?? 2,
   }).format(n);
-  return `${formatted} ${inv.currency || ''}`.trim();
+  return currency ? `${formatted} ${currency}` : formatted;
 }
 
 function methodBadge(inv) {
@@ -78,12 +78,25 @@ export default function InvoiceList({ invoices, loading }) {
                         </span>
                       </p>
                     )}
+                    {inv.amount_huf != null && inv.currency && inv.currency !== 'HUF' && (
+                      <p className="mt-1 text-xs text-[var(--nw-ink)]/50">
+                        MNB {inv.mnb_rate}
+                        {inv.mnb_rate_date ? ` (${inv.mnb_rate_date})` : ''}
+                      </p>
+                    )}
                     {inv.error_message && inv.status === 'error' && (
                       <p className="mt-1 text-sm text-red-800">{inv.error_message}</p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-medium">{formatAmount(inv)}</p>
+                    <p className="text-sm font-medium">
+                      {formatMoney(inv.gross_amount, inv.currency)}
+                    </p>
+                    {inv.amount_huf != null && (
+                      <p className="mt-0.5 text-sm text-[var(--nw-ink)]/80">
+                        {formatMoney(inv.amount_huf, 'HUF', 0)}
+                      </p>
+                    )}
                     <p
                       className={[
                         'mt-1 text-sm',

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import db from '../db.js';
+import { convertToHuf } from '../mnb/convert.js';
 import { uploadsDir } from '../paths.js';
 import { extractInvoiceFromText } from './extractInvoice.js';
 import { extractInvoiceWithLlm, isLlmConfigured } from './llmExtract.js';
@@ -31,6 +32,20 @@ const updateExtracted = db.prepare(`
     partner_name = ?,
     partner_tax_id = ?,
     extraction_method = ?,
+    mnb_rate = ?,
+    mnb_rate_date = ?,
+    amount_huf = ?,
+    status = ?,
+    error_message = ?,
+    updated_at = datetime('now')
+  WHERE id = ?
+`);
+
+const updateFxOnly = db.prepare(`
+  UPDATE invoices SET
+    mnb_rate = ?,
+    mnb_rate_date = ?,
+    amount_huf = ?,
     status = ?,
     error_message = ?,
     updated_at = datetime('now')
@@ -53,13 +68,19 @@ const listPending = db.prepare(`
   SELECT id FROM invoices WHERE status IN ('pending', 'processing') ORDER BY id
 `);
 
+const listFxBackfill = db.prepare(`
+  SELECT id FROM invoices
+  WHERE status = 'done' AND amount_huf IS NULL
+  ORDER BY id
+`);
+
 function resolvePdfPath(row) {
   if (!row.stored_path) return null;
   if (path.isAbsolute(row.stored_path)) return row.stored_path;
   return path.join(uploadsDir, row.stored_path);
 }
 
-function persistFields(id, fields, method, status, errorMessage) {
+function persistFields(id, fields, method, status, errorMessage, fx = null) {
   updateExtracted.run(
     fields.invoice_number,
     fields.issuer_name,
@@ -75,6 +96,9 @@ function persistFields(id, fields, method, status, errorMessage) {
     fields.partner_name,
     fields.partner_tax_id,
     method,
+    fx?.mnb_rate ?? null,
+    fx?.mnb_rate_date ?? null,
+    fx?.amount_huf ?? null,
     status,
     errorMessage,
     id,
@@ -94,16 +118,88 @@ function handleDupe(id, fields) {
   };
 }
 
+async function applyFx(fields) {
+  return convertToHuf({
+    currency: fields.currency,
+    gross_amount: fields.gross_amount,
+    fulfillment_date: fields.fulfillment_date,
+  });
+}
+
+async function finishWithFx(id, fields, method, baseMessage) {
+  try {
+    const fx = await applyFx(fields);
+    persistFields(id, fields, method, 'done', baseMessage || null, fx);
+    return {
+      ok: true,
+      invoice: getById.get(id),
+      fields,
+      extraction_method: method,
+      fx,
+    };
+  } catch (e) {
+    persistFields(
+      id,
+      fields,
+      method,
+      'error',
+      `FX: ${e.message}`,
+      null,
+    );
+    return {
+      ok: false,
+      invoice: getById.get(id),
+      fields,
+      extraction_method: method,
+      error: e.message,
+    };
+  }
+}
+
+/**
+ * Convert HUF for an already-extracted done row missing amount_huf.
+ */
+export async function backfillFxById(id) {
+  const row = getById.get(id);
+  if (!row) return { ok: false, error: 'Not found' };
+  if (row.amount_huf != null) {
+    return { ok: true, invoice: row, skipped: true };
+  }
+  if (!row.currency || row.gross_amount == null || !row.fulfillment_date) {
+    updateFxOnly.run(null, null, null, 'error', 'FX: missing currency/amount/fulfillment', id);
+    return { ok: false, invoice: getById.get(id) };
+  }
+
+  try {
+    const fx = await convertToHuf({
+      currency: row.currency,
+      gross_amount: row.gross_amount,
+      fulfillment_date: row.fulfillment_date,
+    });
+    updateFxOnly.run(fx.mnb_rate, fx.mnb_rate_date, fx.amount_huf, 'done', row.error_message, id);
+    return { ok: true, invoice: getById.get(id), fx };
+  } catch (e) {
+    updateFxOnly.run(null, null, null, 'error', `FX: ${e.message}`, id);
+    return { ok: false, invoice: getById.get(id), error: e.message };
+  }
+}
+
 /**
  * Extract fields for one invoice row. Rules first; LLM only if validation fails.
+ * Then MNB FX → amount_huf.
  */
 export async function processInvoiceById(id) {
   const row = getById.get(id);
   if (!row) return { ok: false, error: 'Not found' };
 
-  // Already successfully extracted — do not call LLM again (token saver)
-  if (row.status === 'done' && row.extraction_method) {
+  // Fully done (extracted + FX) — skip re-LLM / re-extract
+  if (row.status === 'done' && row.extraction_method && row.amount_huf != null) {
     return { ok: true, invoice: row, skipped: true };
+  }
+
+  // Extracted but missing FX — only convert
+  if (row.status === 'done' && row.extraction_method && row.amount_huf == null) {
+    return backfillFxById(id);
   }
 
   setStatus.run('processing', null, id);
@@ -128,20 +224,12 @@ export async function processInvoiceById(id) {
       const dupe = handleDupe(id, ruleFields);
       if (dupe) return dupe;
 
-      persistFields(
+      return finishWithFx(
         id,
         ruleFields,
         'rules',
-        'done',
         ruleValidation.warnings.length ? ruleValidation.warnings.join('; ') : null,
       );
-      return {
-        ok: true,
-        invoice: getById.get(id),
-        fields: ruleFields,
-        validation: ruleValidation,
-        extraction_method: 'rules',
-      };
     }
 
     // --- LLM fallback ---
@@ -202,23 +290,10 @@ export async function processInvoiceById(id) {
     const dupe = handleDupe(id, llmFields);
     if (dupe) return dupe;
 
-    persistFields(
-      id,
-      llmFields,
-      'llm',
-      'done',
-      llmValidation.warnings.length
-        ? `LLM ${llmModel}; ${llmValidation.warnings.join('; ')}`
-        : `LLM ${llmModel}`,
-    );
-
-    return {
-      ok: true,
-      invoice: getById.get(id),
-      fields: llmFields,
-      validation: llmValidation,
-      extraction_method: 'llm',
-    };
+    const msg = llmValidation.warnings.length
+      ? `LLM ${llmModel}; ${llmValidation.warnings.join('; ')}`
+      : `LLM ${llmModel}`;
+    return finishWithFx(id, llmFields, 'llm', msg);
   } catch (e) {
     setStatus.run('error', e.message || 'Extraction failed', id);
     return { ok: false, invoice: getById.get(id), error: e.message };
@@ -232,8 +307,12 @@ export async function processPendingInvoices() {
   queueRunning = true;
   const results = [];
   try {
-    const ids = listPending.all().map((r) => r.id);
-    for (const id of ids) {
+    const ids = [
+      ...listPending.all().map((r) => r.id),
+      ...listFxBackfill.all().map((r) => r.id),
+    ];
+    const unique = [...new Set(ids)];
+    for (const id of unique) {
       results.push(await processInvoiceById(id));
     }
   } finally {

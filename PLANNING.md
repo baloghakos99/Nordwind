@@ -86,8 +86,10 @@ Számlaszám; kiállító/vevő név+adószám; kiállítás dátuma; **teljesí
 - Unit tesztek: hétvége/ünnep fallback, unit≠1, kerekítés
 
 ### Acceptance
-- Ismételt futás nem spameli az MNB-t
-- Számlánként tárolt: felhasznált árfolyam + árfolyam dátuma + HUF összeg
+- [x] Ismételt futás nem spameli az MNB-t
+- [x] Számlánként tárolt: felhasznált árfolyam + árfolyam dátuma + HUF összeg
+
+**Állapot:** kész (2026-11-24) — SOAP http + cache + on-or-before + half-up; UI mutatja a HUF-ot
 
 ---
 

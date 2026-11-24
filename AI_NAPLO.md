@@ -89,4 +89,19 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 07:45 – Phase 4: MNB FX modul
+
+### Prompt
+> Implementáld a Phase 4 tervet (MNB SOAP, cache, on-or-before, half-up, UI, tesztek).
+
+### Agent válasz / döntés
+- SOAP `GetExchangeRates` **http**; nested XML parse (vessző, `unit`).
+- Cache `exchange_rates`; miss → 14 napos ablak fetch; lookup on-or-before teljesítés.
+- HUF: rate 1, nincs hívás; `amount_huf = floor(x+0.5)`.
+- Extrakció `done` után FX; hiányzó HUF backfill a process queue-ban.
+- FX hiba → `error` (ne menjen aggregációba üres HUF-fal).
+- Unit tesztek mockkal (19 pass összesen).
+
+---
+
 
