@@ -10,6 +10,7 @@ import type { FxConversionResult } from '../types/mnb.js';
 import { getProcessConcurrency, mapPool } from '../util/concurrency.js';
 import { extractInvoiceFromText } from './extractInvoice.js';
 import { extractInvoiceWithLlm, isLlmConfigured } from './llmExtract.js';
+import { crossCheckLlmAgainstSource } from './llmValidate.js';
 import { extractPdfText } from './pdfText.js';
 import { validateExtraction } from './validate.js';
 
@@ -293,19 +294,28 @@ export async function processInvoiceById(id: number): Promise<ProcessResult> {
     }
 
     const llmValidation = validateExtraction(llmFields);
-    if (!llmValidation.ok) {
+    const crossErrors = crossCheckLlmAgainstSource(llmFields, text);
+    if (!llmValidation.ok || crossErrors.length) {
+      const detail = [
+        ...llmValidation.errors,
+        ...crossErrors,
+      ].join('; ');
       persistFields(
         id,
         llmFields,
         'llm',
         'error',
-        `LLM (${llmModel}) invalid: ${llmValidation.errors.join('; ')}`,
+        `LLM (${llmModel}) invalid: ${detail}`,
       );
       return {
         ok: false,
         invoice: getById.get(id),
         fields: llmFields,
-        validation: llmValidation,
+        validation: {
+          ...llmValidation,
+          ok: false,
+          errors: [...llmValidation.errors, ...crossErrors],
+        },
         extraction_method: 'llm',
       };
     }

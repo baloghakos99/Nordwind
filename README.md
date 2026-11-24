@@ -56,6 +56,12 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
    - Már `done` számlát nem küldjük újra.
    - A listában látszik: *szabályok alapján* / *LLM tartalék*.
    - Párhuzamos feldolgozás: `LLM_CONCURRENCY` (alap 3) — egyszerre ennyi számla (rules/LLM/FX).
+   - **LLM válasz ellenőrzése** (FELADAT):
+     1. JSON parse + kötelező kulcsok (`assertLlmJsonShape`)
+     2. normalizálás után ugyanaz a `validateExtraction` quality gate, mint a rulesnál
+     3. forrásszöveg cross-check: számlaszám / pénznem / bruttó összeg megjelenik-e a PDF szövegben (`crossCheckLlmAgainstSource`)
+     - Nincs tételsor-kinyerés, ezért nincs „sorok összege = végösszeg” ellenőrzés; helyette a fenti mező+forrás egyezés.
+     - Bármelyik fail → `error`, nem kerül a kimutatásba.
 
 ### MNB árfolyam (Phase 4)
 

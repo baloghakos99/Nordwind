@@ -2,6 +2,7 @@ import type { ExtractedInvoiceFields } from '../types/invoice.js';
 import { NORDWIND } from './nordwind.js';
 import { parseAmount } from './parseAmount.js';
 import { parseDate } from './parseDate.js';
+import { assertLlmJsonShape } from './llmValidate.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -146,12 +147,14 @@ export async function extractInvoiceWithLlm(
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenRouter empty response');
 
-  let parsed: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(stripFence(content)) as Record<string, unknown>;
+    parsed = JSON.parse(stripFence(content));
   } catch {
     throw new Error('OpenRouter response was not valid JSON');
   }
+
+  assertLlmJsonShape(parsed);
 
   const fields = normalizeLlmFields(parsed);
   if (!fields) throw new Error('OpenRouter returned empty fields');

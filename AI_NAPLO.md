@@ -194,4 +194,17 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 11:08 – LLM válasz ellenőrzés (FELADAT)
+
+### Prompt
+> FELADAT: ha LLM-et használsz, írd le / ellenőrizd a választ (séma, összeg-egyezés). Ilyen még nem volt — mehet.
+
+### Agent válasz / döntés
+- `assertLlmJsonShape`: kötelező kulcsok + direction/gross típus.
+- `crossCheckLlmAgainstSource`: számlaszám / currency / gross a PDF szövegben (nincs tételsor → nincs sorösszeg↔totál).
+- Pipeline: shape → normalize → `validateExtraction` → cross-check; fail → `error`.
+- README + unit tesztek.
+
+---
+
 
