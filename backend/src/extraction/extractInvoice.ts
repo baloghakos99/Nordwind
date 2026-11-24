@@ -1,3 +1,9 @@
+import type {
+  DirectionResolution,
+  ExtractedInvoiceFields,
+  Parties,
+  TaxIdHit,
+} from '../types/invoice.js';
 import { findAmountNear, detectCurrency, parseAmount } from './parseAmount.js';
 import { findDateAfter, parseDate } from './parseDate.js';
 import { isNordwindName, isNordwindTaxId, normalizeTaxId } from './nordwind.js';
@@ -27,9 +33,9 @@ const EU_VAT_RE = /\b([A-Z]{2})\s*([A-Z0-9]{8,12})\b/g;
 const HU_TAX_RE = /\b(\d{8}-\d-\d{2})\b/g;
 const EIN_RE = /\bEIN\s*(\d{2}-\d{7})\b/i;
 
-function valueAfterLabel(text, labelRe) {
+function valueAfterLabel(text: string, labelRe: RegExp): string | null {
   const m = text.match(labelRe);
-  if (!m) return null;
+  if (!m || m.index == null) return null;
   const rest = text.slice(m.index + m[0].length);
   const line = rest.split('\n')[0].trim();
   if (line) return line.replace(/^[:.\-–]\s*/, '').trim() || null;
@@ -37,7 +43,7 @@ function valueAfterLabel(text, labelRe) {
   return next ? next.trim() : null;
 }
 
-function extractInvoiceNumber(text) {
+function extractInvoiceNumber(text: string): string | null {
   const labeled = valueAfterLabel(text, INVOICE_NO_LABELS);
   if (labeled) {
     const token = labeled.split(/\s{2,}|\s(?=[A-Za-z]{3,})/)[0].trim();
@@ -47,7 +53,7 @@ function extractInvoiceNumber(text) {
   return invLine ? invLine[1] : null;
 }
 
-function extractCurrency(text) {
+function extractCurrency(text: string): string | null {
   const labeled = valueAfterLabel(text, CURRENCY_LABELS);
   if (labeled) {
     const code = detectCurrency(labeled) || labeled.trim().toUpperCase().slice(0, 3);
@@ -56,21 +62,28 @@ function extractCurrency(text) {
   return detectCurrency(text);
 }
 
-function collectTaxIds(text) {
-  const found = [];
+function collectTaxIds(text: string): TaxIdHit[] {
+  const found: TaxIdHit[] = [];
   for (const m of text.matchAll(HU_TAX_RE)) {
-    found.push({ raw: m[1], norm: normalizeTaxId(m[1]), index: m.index });
+    if (m.index == null) continue;
+    const norm = normalizeTaxId(m[1]);
+    if (!norm) continue;
+    found.push({ raw: m[1], norm, index: m.index });
   }
   for (const m of text.matchAll(EU_VAT_RE)) {
+    if (m.index == null) continue;
     const raw = `${m[1]}${m[2]}`;
-    found.push({ raw, norm: normalizeTaxId(raw), index: m.index });
+    const norm = normalizeTaxId(raw);
+    if (!norm) continue;
+    found.push({ raw, norm, index: m.index });
   }
   const ein = text.match(EIN_RE);
-  if (ein) {
-    found.push({ raw: ein[1], norm: normalizeTaxId(ein[1]), index: ein.index });
+  if (ein && ein.index != null) {
+    const norm = normalizeTaxId(ein[1]);
+    if (norm) found.push({ raw: ein[1], norm, index: ein.index });
   }
   // Deduplicate by norm, keep first
-  const seen = new Set();
+  const seen = new Set<string>();
   return found.filter((t) => {
     if (seen.has(t.norm)) return false;
     seen.add(t.norm);
@@ -78,7 +91,7 @@ function collectTaxIds(text) {
   });
 }
 
-function companyNameNear(text, index, direction = 'before') {
+function companyNameNear(text: string, index: number, direction: 'before' = 'before'): string | null {
   const lines = text.split('\n');
   let pos = 0;
   let lineIdx = 0;
@@ -105,9 +118,9 @@ function companyNameNear(text, index, direction = 'before') {
   return null;
 }
 
-function splitParties(text) {
+function splitParties(text: string): Parties {
   const buyerMatch = text.match(BUYER_SECTION);
-  const buyerStart = buyerMatch ? buyerMatch.index : Math.floor(text.length * 0.35);
+  const buyerStart = buyerMatch?.index != null ? buyerMatch.index : Math.floor(text.length * 0.35);
   const header = text.slice(0, buyerStart);
   const buyerBlock = text.slice(buyerStart, buyerStart + 500);
 
@@ -124,10 +137,13 @@ function splitParties(text) {
   // Atlas-style: EIN in header
   if (!issuerTax) {
     const ein = text.match(EIN_RE);
-    if (ein) issuerTax = { raw: ein[1], norm: normalizeTaxId(ein[1]), index: ein.index };
+    if (ein && ein.index != null) {
+      const norm = normalizeTaxId(ein[1]);
+      if (norm) issuerTax = { raw: ein[1], norm, index: ein.index };
+    }
   }
 
-  let issuerName = null;
+  let issuerName: string | null = null;
   const firstLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   for (const l of firstLines.slice(0, 8)) {
     if (/^(számla|rechnung|invoice|factura|fattura|faktura)$/i.test(l)) continue;
@@ -143,7 +159,7 @@ function splitParties(text) {
     issuerName = companyNameNear(text, issuerTax.index, 'before');
   }
 
-  let buyerName = null;
+  let buyerName: string | null = null;
   const buyerLines = buyerBlock.split('\n').map((l) => l.trim()).filter(Boolean);
   for (const l of buyerLines.slice(0, 10)) {
     if (BUYER_SECTION.test(l)) continue;
@@ -167,7 +183,7 @@ function splitParties(text) {
   };
 }
 
-function resolveDirection(parties) {
+function resolveDirection(parties: Parties): DirectionResolution {
   const issuerIsUs = isNordwindTaxId(parties.issuerTaxId) || isNordwindName(parties.issuerName);
   const buyerIsUs = isNordwindTaxId(parties.buyerTaxId) || isNordwindName(parties.buyerName);
 
@@ -209,7 +225,7 @@ function resolveDirection(parties) {
 /**
  * Rule-based invoice field extraction from plain text.
  */
-export function extractInvoiceFromText(text) {
+export function extractInvoiceFromText(text: string): ExtractedInvoiceFields {
   const normalized = text.replace(/\u00a0/g, ' ');
 
   const invoiceNumber = extractInvoiceNumber(normalized);
@@ -218,8 +234,8 @@ export function extractInvoiceFromText(text) {
   const dueDate = findDateAfter(normalized, DUE_LABELS);
 
   const gross = findAmountNear(normalized, GROSS_LABELS);
-  let currency = extractCurrency(normalized) || gross?.currency || null;
-  let grossAmount = gross?.amount ?? null;
+  let currency: string | null = extractCurrency(normalized) || gross?.currency || null;
+  let grossAmount: number | null = gross?.amount ?? null;
 
   // Fallback: last "Total due" / money-looking near end
   if (grossAmount == null) {

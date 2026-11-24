@@ -1,35 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import InvoiceList from './components/InvoiceList.jsx';
-import UploadZone from './components/UploadZone.jsx';
+import type { Invoice, InvoiceListResponse } from './types';
+import UploadZone from './components/UploadZone';
+import InvoiceList from './components/InvoiceList';
 
 export default function App() {
-  const [invoices, setInvoices] = useState([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState(null);
+  const [listError, setListError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setListError(null);
     try {
       const res = await fetch('/api/invoices');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as InvoiceListResponse;
       setInvoices(data.invoices || []);
     } catch (e) {
-      setListError(e.message);
+      setListError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   // Poll while any invoice is still pending/processing (extraction queue)
   useEffect(() => {
     const busy = invoices.some((i) => i.status === 'pending' || i.status === 'processing');
     if (!busy) return undefined;
-    const t = setInterval(refresh, 1500);
+    const t = setInterval(() => {
+      void refresh();
+    }, 1500);
     return () => clearInterval(t);
   }, [invoices, refresh]);
 
@@ -47,7 +50,10 @@ export default function App() {
           a forintos kimutatás a következő fázisokban jön.
         </p>
 
-        <UploadZone onUploaded={() => refresh()} />
+        <UploadZone onUploaded={() => {
+          void refresh();
+        }}
+        />
 
         {listError && (
           <p className="mt-4 text-sm text-red-800">Lista hiba: {listError}</p>

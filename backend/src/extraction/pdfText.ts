@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { PDFParse } from 'pdf-parse';
 
 /** Extract full text from a PDF file (all pages). */
-export async function extractPdfText(filePath) {
+export async function extractPdfText(filePath: string): Promise<string> {
   const data = fs.readFileSync(filePath);
   const parser = new PDFParse({ data });
   try {

@@ -17,9 +17,9 @@ Alkalmazás: **http://localhost:8080**
 
 | Réteg | Tech |
 |---|---|
-| API | Node.js, Express |
+| API | Node.js (TypeScript / `tsx`), Express |
 | DB | SQLite (`better-sqlite3`), volume: `/data` |
-| UI | Vite, React, Tailwind |
+| UI | Vite, React, TypeScript, Tailwind |
 | Futtatás | egy konténer: API + built SPA |
 
 ```
@@ -39,7 +39,7 @@ npm run dev
 - UI: **http://localhost:5173** (Vite, `/api` → backend `:8080`)
 - API: **http://localhost:8080**
 
-Együtt fut a backend (`node --watch`) és a frontend (Vite) a gyökér `concurrently` scriptjével.
+Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurrently` scriptjével.
 
 ## Állapot
 

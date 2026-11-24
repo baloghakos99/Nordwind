@@ -1,4 +1,7 @@
-const REQUIRED = [
+import { isCurrencyCode, isInvoiceDirection } from '../types/domain.js';
+import type { ExtractedInvoiceFields, ExtractionValidation } from '../types/invoice.js';
+
+const REQUIRED: (keyof ExtractedInvoiceFields)[] = [
   'invoice_number',
   'issuer_name',
   'buyer_name',
@@ -11,14 +14,12 @@ const REQUIRED = [
   'partner_name',
 ];
 
-const CURRENCIES = new Set(['HUF', 'EUR', 'USD', 'GBP', 'PLN']);
-
 /**
  * Validate extracted invoice fields. Returns { ok, errors[], warnings[] }.
  */
-export function validateExtraction(fields) {
-  const errors = [];
-  const warnings = [];
+export function validateExtraction(fields: ExtractedInvoiceFields): ExtractionValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const key of REQUIRED) {
     const v = fields[key];
@@ -27,7 +28,7 @@ export function validateExtraction(fields) {
     }
   }
 
-  if (fields.currency && !CURRENCIES.has(fields.currency)) {
+  if (fields.currency && !isCurrencyCode(fields.currency)) {
     errors.push(`Unsupported currency: ${fields.currency}`);
   }
 
@@ -37,7 +38,7 @@ export function validateExtraction(fields) {
     }
   }
 
-  if (fields.direction && !['incoming', 'outgoing'].includes(fields.direction)) {
+  if (fields.direction && !isInvoiceDirection(fields.direction)) {
     errors.push(`Invalid direction: ${fields.direction}`);
   }
 

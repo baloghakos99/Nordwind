@@ -32,4 +32,5 @@ RUN mkdir -p /data /data/uploads
 
 EXPOSE 8080
 VOLUME ["/data"]
-CMD ["node", "backend/src/index.js"]
+WORKDIR /app/backend
+CMD ["npx", "tsx", "src/index.ts"]

@@ -1,16 +1,23 @@
+import type { ExtractedInvoiceFields } from '../types/invoice.js';
 import { NORDWIND } from './nordwind.js';
 import { parseAmount } from './parseAmount.js';
 import { parseDate } from './parseDate.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-function getConfig() {
+interface LlmConfig {
+  apiKey: string | undefined;
+  model: string;
+  enabled: boolean;
+}
+
+function getConfig(): LlmConfig {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   const model = process.env.OPENROUTER_MODEL?.trim() || 'google/gemini-2.5-flash';
   return { apiKey, model, enabled: Boolean(apiKey) };
 }
 
-export function isLlmConfigured() {
+export function isLlmConfigured(): boolean {
   return getConfig().enabled;
 }
 
@@ -25,7 +32,11 @@ Keys: invoice_number, issuer_name, issuer_tax_id, buyer_name, buyer_tax_id,
 issue_date, fulfillment_date, due_date, currency, gross_amount, direction,
 partner_name, partner_tax_id. Use null if unknown.`;
 
-function buildUserPrompt(text, partial, ruleErrors) {
+function buildUserPrompt(
+  text: string,
+  partial: Partial<ExtractedInvoiceFields> | null,
+  ruleErrors: string[],
+): string {
   const clipped = text.length > 12000 ? `${text.slice(0, 12000)}\n…[truncated]` : text;
   return [
     'Invoice text:',
@@ -41,19 +52,25 @@ function buildUserPrompt(text, partial, ruleErrors) {
   ].join('\n');
 }
 
-function stripFence(s) {
+function stripFence(s: string): string {
   const t = String(s || '').trim();
   const m = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
   return (m ? m[1] : t).trim();
 }
 
-function normalizeLlmFields(raw) {
+function asIsoOrNull(value: unknown): string | null {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return parseDate(typeof value === 'string' ? value : null);
+}
+
+function normalizeLlmFields(raw: Record<string, unknown> | null): ExtractedInvoiceFields | null {
   if (!raw || typeof raw !== 'object') return null;
   const gross = raw.gross_amount;
-  let grossAmount = typeof gross === 'number' ? gross : parseAmount(String(gross ?? ''));
-  const direction = raw.direction === 'bejövő' ? 'incoming'
-    : raw.direction === 'kimenő' ? 'outgoing'
-      : raw.direction;
+  const grossAmount = typeof gross === 'number' ? gross : parseAmount(String(gross ?? ''));
+  const directionRaw = raw.direction;
+  const direction = directionRaw === 'bejövő' ? 'incoming'
+    : directionRaw === 'kimenő' ? 'outgoing'
+      : directionRaw;
 
   return {
     invoice_number: raw.invoice_number ? String(raw.invoice_number).trim() : null,
@@ -61,9 +78,9 @@ function normalizeLlmFields(raw) {
     issuer_tax_id: raw.issuer_tax_id ? String(raw.issuer_tax_id).trim() : null,
     buyer_name: raw.buyer_name ? String(raw.buyer_name).trim() : null,
     buyer_tax_id: raw.buyer_tax_id ? String(raw.buyer_tax_id).trim() : null,
-    issue_date: parseDate(raw.issue_date) || (typeof raw.issue_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.issue_date) ? raw.issue_date : null),
-    fulfillment_date: parseDate(raw.fulfillment_date) || (typeof raw.fulfillment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.fulfillment_date) ? raw.fulfillment_date : null),
-    due_date: parseDate(raw.due_date) || (typeof raw.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due_date) ? raw.due_date : null),
+    issue_date: asIsoOrNull(raw.issue_date),
+    fulfillment_date: asIsoOrNull(raw.fulfillment_date),
+    due_date: asIsoOrNull(raw.due_date),
     currency: raw.currency ? String(raw.currency).trim().toUpperCase() : null,
     gross_amount: grossAmount,
     direction: direction === 'incoming' || direction === 'outgoing' ? direction : null,
@@ -72,14 +89,28 @@ function normalizeLlmFields(raw) {
   };
 }
 
+export interface LlmExtractResult {
+  fields: ExtractedInvoiceFields;
+  model: string;
+  nordwindHint: string;
+}
+
+export interface LlmExtractOptions {
+  partial?: Partial<ExtractedInvoiceFields> | null;
+  ruleErrors?: string[];
+}
+
 /**
  * OpenRouter chat completion → normalized invoice fields.
  * Throws if not configured or API/parse fails.
  */
-export async function extractInvoiceWithLlm(text, { partial = null, ruleErrors = [] } = {}) {
+export async function extractInvoiceWithLlm(
+  text: string,
+  { partial = null, ruleErrors = [] }: LlmExtractOptions = {},
+): Promise<LlmExtractResult> {
   const { apiKey, model, enabled } = getConfig();
   if (!enabled) {
-    const err = new Error('OPENROUTER_API_KEY not set');
+    const err = new Error('OPENROUTER_API_KEY not set') as Error & { code: string };
     err.code = 'LLM_DISABLED';
     throw err;
   }
@@ -109,13 +140,15 @@ export async function extractInvoiceWithLlm(text, { partial = null, ruleErrors =
     throw new Error(`OpenRouter HTTP ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  const data = await res.json();
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenRouter empty response');
 
-  let parsed;
+  let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(stripFence(content));
+    parsed = JSON.parse(stripFence(content)) as Record<string, unknown>;
   } catch {
     throw new Error('OpenRouter response was not valid JSON');
   }

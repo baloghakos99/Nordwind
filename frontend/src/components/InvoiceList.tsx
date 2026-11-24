@@ -1,21 +1,27 @@
-const STATUS_LABEL = {
+import type { ExtractionMethod, Invoice, InvoiceDirection, InvoiceStatus } from '../types';
+
+const STATUS_LABEL: Record<InvoiceStatus, string> = {
   pending: 'várakozik',
   processing: 'feldolgozás',
   done: 'kész',
   error: 'hiba',
 };
 
-const DIRECTION_LABEL = {
+const DIRECTION_LABEL: Record<InvoiceDirection, string> = {
   incoming: 'bejövő',
   outgoing: 'kimenő',
 };
 
-const METHOD_LABEL = {
+const METHOD_LABEL: Record<ExtractionMethod, string> = {
   rules: 'szabályok',
   llm: 'LLM',
 };
 
-function formatMoney(amount, currency, fractionDigits) {
+function formatMoney(
+  amount: number | null | undefined,
+  currency?: string | null,
+  fractionDigits?: number,
+): string {
   if (amount == null) return '—';
   const n = Number(amount);
   const formatted = new Intl.NumberFormat('hu-HU', {
@@ -25,14 +31,19 @@ function formatMoney(amount, currency, fractionDigits) {
   return currency ? `${formatted} ${currency}` : formatted;
 }
 
-function methodBadge(inv) {
+function methodBadge(inv: Invoice): string | null {
   if (inv.status !== 'done' && inv.status !== 'error') return null;
   const method = inv.extraction_method;
   if (!method) return null;
   return METHOD_LABEL[method] || method;
 }
 
-export default function InvoiceList({ invoices, loading }) {
+interface InvoiceListProps {
+  invoices: Invoice[];
+  loading: boolean;
+}
+
+export default function InvoiceList({ invoices, loading }: InvoiceListProps) {
   return (
     <section className="mt-12">
       <div className="flex items-baseline justify-between gap-4">

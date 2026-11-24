@@ -1,13 +1,19 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import type { UploadResponse, UploadSummary } from '../types';
 
-export default function UploadZone({ onUploaded, disabled }) {
-  const inputRef = useRef(null);
+interface UploadZoneProps {
+  onUploaded?: (data: UploadResponse) => void;
+  disabled?: boolean;
+}
+
+export default function UploadZone({ onUploaded, disabled }: UploadZoneProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [lastSummary, setLastSummary] = useState(null);
-  const [error, setError] = useState(null);
+  const [lastSummary, setLastSummary] = useState<UploadSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const uploadFiles = useCallback(async (fileList) => {
+  const uploadFiles = useCallback(async (fileList: FileList | File[]) => {
     const files = [...fileList].filter((f) =>
       f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
     );
@@ -30,25 +36,29 @@ export default function UploadZone({ onUploaded, disabled }) {
         method: 'POST',
         body,
       });
-      const data = await res.json();
+      const data = (await res.json()) as UploadResponse;
       if (!res.ok && !data.results) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setLastSummary(data.summary);
+      setLastSummary(data.summary ?? null);
       onUploaded?.(data);
     } catch (e) {
-      setError(e.message || 'Feltöltés sikertelen');
+      setError(e instanceof Error ? e.message : 'Feltöltés sikertelen');
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   }, [onUploaded]);
 
-  const onDrop = (e) => {
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
     if (disabled || uploading) return;
-    uploadFiles(e.dataTransfer.files);
+    void uploadFiles(e.dataTransfer.files);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
   };
 
   return (
@@ -60,9 +70,7 @@ export default function UploadZone({ onUploaded, disabled }) {
       <div
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
-        }}
+        onKeyDown={onKeyDown}
         onDragEnter={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -97,7 +105,7 @@ export default function UploadZone({ onUploaded, disabled }) {
           accept="application/pdf,.pdf"
           multiple
           className="hidden"
-          onChange={(e) => uploadFiles(e.target.files || [])}
+          onChange={(e) => void uploadFiles(e.target.files || [])}
         />
       </div>
 

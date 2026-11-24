@@ -115,6 +115,7 @@ describe('extractInvoiceFromText', () => {
     assert.equal(f.issue_date, '2026-09-10');
     assert.equal(f.fulfillment_date, '2026-09-05');
     assert.equal(f.due_date, '2026-09-25');
+    assert.ok(f.issuer_name);
     assert.match(f.issuer_name, /PANNON/i);
     assert.ok(validateExtraction(f).ok);
   });
@@ -140,6 +141,7 @@ describe('extractInvoiceFromText', () => {
     assert.equal(f.issue_date, '2026-05-01');
     assert.equal(f.fulfillment_date, '2026-04-30');
     assert.equal(f.due_date, '2026-05-16');
+    assert.ok(f.issuer_name);
     assert.match(f.issuer_name, /Atlas/i);
     assert.ok(validateExtraction(f).ok);
   });

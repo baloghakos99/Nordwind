@@ -1,12 +1,14 @@
 import db from '../db.js';
+import type { IsoDate } from '../types/domain.js';
+import type { ExchangeRateRow, MnbRateRow } from '../types/mnb.js';
 
-const selectExact = db.prepare(`
+const selectExact = db.prepare<[string, string], ExchangeRateRow>(`
   SELECT currency, rate_date, unit, rate
   FROM exchange_rates
   WHERE currency = ? AND rate_date = ?
 `);
 
-const selectOnOrBefore = db.prepare(`
+const selectOnOrBefore = db.prepare<[string, string], ExchangeRateRow>(`
   SELECT currency, rate_date, unit, rate
   FROM exchange_rates
   WHERE currency = ? AND rate_date <= ?
@@ -23,16 +25,16 @@ const upsert = db.prepare(`
     fetched_at = datetime('now')
 `);
 
-export function getExactRate(currency, rateDate) {
+export function getExactRate(currency: string, rateDate: IsoDate): ExchangeRateRow | null {
   return selectExact.get(currency.toUpperCase(), rateDate) || null;
 }
 
-export function getOnOrBeforeRate(currency, rateDate) {
+export function getOnOrBeforeRate(currency: string, rateDate: IsoDate): ExchangeRateRow | null {
   return selectOnOrBefore.get(currency.toUpperCase(), rateDate) || null;
 }
 
-export function storeRates(rows) {
-  const tx = db.transaction((list) => {
+export function storeRates(rows: MnbRateRow[]): void {
+  const tx = db.transaction((list: MnbRateRow[]) => {
     for (const row of list) {
       upsert.run(
         row.currency.toUpperCase(),

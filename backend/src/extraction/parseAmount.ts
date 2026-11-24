@@ -1,4 +1,7 @@
-const CURRENCY_SYMBOLS = [
+import type { CurrencyCode } from '../types/domain.js';
+import type { ParsedAmountHit } from '../types/invoice.js';
+
+const CURRENCY_SYMBOLS: { re: RegExp; code: CurrencyCode }[] = [
   { re: /€|eur\b/i, code: 'EUR' },
   { re: /\$|usd\b/i, code: 'USD' },
   { re: /£|gbp\b/i, code: 'GBP' },
@@ -6,7 +9,10 @@ const CURRENCY_SYMBOLS = [
   { re: /\bhuf\b|\bft\b|forint/i, code: 'HUF' },
 ];
 
-export function detectCurrency(fragment, fallback = null) {
+export function detectCurrency(
+  fragment: string | null | undefined,
+  fallback: CurrencyCode | null = null,
+): CurrencyCode | null {
   if (!fragment) return fallback;
   for (const { re, code } of CURRENCY_SYMBOLS) {
     if (re.test(fragment)) return code;
@@ -18,7 +24,7 @@ export function detectCurrency(fragment, fallback = null) {
  * Parse localized money string → number or null.
  * Handles: 1 234,56 | 1.234,56 | 1,234.56 | 186 639 | 889.09
  */
-export function parseAmount(raw) {
+export function parseAmount(raw: string | number | null | undefined): number | null {
   if (raw == null) return null;
   let s = String(raw).trim();
   s = s.replace(/(?:€|\$|£|zł|Ft|HUF|EUR|USD|GBP|PLN)\s*$/i, '').trim();
@@ -64,13 +70,17 @@ export function parseAmount(raw) {
   return Number.isFinite(n) ? n : null;
 }
 
-export function findAmountNear(text, labelRegex) {
-  const re = new RegExp(labelRegex.source, labelRegex.flags.includes('i') ? labelRegex.flags : `${labelRegex.flags}i`);
+export function findAmountNear(text: string, labelRegex: RegExp): ParsedAmountHit | null {
+  const re = new RegExp(
+    labelRegex.source,
+    labelRegex.flags.includes('i') ? labelRegex.flags : `${labelRegex.flags}i`,
+  );
   const matches = [...text.matchAll(new RegExp(re.source, `${re.flags}g`))];
   if (matches.length === 0) return null;
 
   // Prefer the last occurrence (totals usually at bottom)
   const m = matches[matches.length - 1];
+  if (m.index == null) return null;
   const window = text.slice(m.index + m[0].length, m.index + m[0].length + 60);
   // Include comma as thousands sep (US: $2,597.86) — previously `[.\s]` only,
   // so `$2,597.86` matched as `$2,59` → 2.59.

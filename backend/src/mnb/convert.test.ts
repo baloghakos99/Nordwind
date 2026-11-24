@@ -30,6 +30,7 @@ describe('parseMnbExchangeRatesXml', () => {
     const rows = parseMnbExchangeRatesXml(SAMPLE_INNER);
     assert.equal(rows.length, 4);
     const eur = rows.find((r) => r.date === '2026-05-30' && r.currency === 'EUR');
+    assert.ok(eur);
     assert.equal(eur.rate, 396.5);
     assert.equal(eur.unit, 1);
   });

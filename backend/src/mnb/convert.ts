@@ -1,14 +1,15 @@
+import type { ConvertToHufInput, FxConversionResult } from '../types/mnb.js';
 import { fetchExchangeRates } from './soapClient.js';
 import { getOnOrBeforeRate, storeRates } from './rateCache.js';
 
 /** Half-up for non-negative numbers (0.5 → up). */
-export function roundHalfUp(value) {
+export function roundHalfUp(value: number): number | null {
   if (!Number.isFinite(value)) return null;
   if (value >= 0) return Math.floor(value + 0.5);
   return Math.ceil(value - 0.5);
 }
 
-function addDaysIso(isoDate, deltaDays) {
+function addDaysIso(isoDate: string, deltaDays: number): string {
   const d = new Date(`${isoDate}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + deltaDays);
   return d.toISOString().slice(0, 10);
@@ -16,7 +17,6 @@ function addDaysIso(isoDate, deltaDays) {
 
 /**
  * Resolve MNB rate for currency on/before fulfillmentDate; convert gross → HUF.
- * @param {{ currency: string, gross_amount: number, fulfillment_date: string, fetchRates?: typeof fetchExchangeRates, lookbackDays?: number }} opts
  */
 export async function convertToHuf({
   currency,
@@ -24,7 +24,7 @@ export async function convertToHuf({
   fulfillment_date,
   fetchRates = fetchExchangeRates,
   lookbackDays = 14,
-}) {
+}: ConvertToHufInput): Promise<FxConversionResult> {
   if (!currency) throw new Error('FX: missing currency');
   if (gross_amount == null || !(Number(gross_amount) >= 0)) {
     throw new Error('FX: invalid gross_amount');
@@ -37,11 +37,13 @@ export async function convertToHuf({
   const gross = Number(gross_amount);
 
   if (curr === 'HUF') {
+    const amount = roundHalfUp(gross);
+    if (amount == null) throw new Error('FX: invalid HUF amount');
     return {
       mnb_rate: 1,
       mnb_rate_unit: 1,
       mnb_rate_date: fulfillment_date,
-      amount_huf: roundHalfUp(gross),
+      amount_huf: amount,
     };
   }
 
@@ -63,11 +65,13 @@ export async function convertToHuf({
 
   const unit = row.unit || 1;
   const huf = (gross * row.rate) / unit;
+  const amount = roundHalfUp(huf);
+  if (amount == null) throw new Error('FX: invalid converted amount');
 
   return {
     mnb_rate: row.rate,
     mnb_rate_unit: unit,
     mnb_rate_date: row.rate_date,
-    amount_huf: roundHalfUp(huf),
+    amount_huf: amount,
   };
 }

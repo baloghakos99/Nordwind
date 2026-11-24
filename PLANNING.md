@@ -1,6 +1,6 @@
 # Planning – Nordwind invoice cash-flow
 
-Stack döntés (rögzítve): **Node.js** backend + **SQLite** + **Vite + React + Tailwind** frontend, egy Docker Compose paranccsal.
+Stack döntés (rögzítve): **Node.js + TypeScript** backend + **SQLite** + **Vite + React + TypeScript + Tailwind** frontend, egy Docker Compose paranccsal.
 
 Fázisok sorrendben; minden fázis után legyen működő, commitolható állapot.
 

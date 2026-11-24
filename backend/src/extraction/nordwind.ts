@@ -8,14 +8,14 @@ export const NORDWIND = {
   taxId: '26481937-2-43',
   taxIdDigits: '26481937',
   euVat: 'HU26481937',
-};
+} as const;
 
-export function normalizeTaxId(raw) {
+export function normalizeTaxId(raw: string | null | undefined): string | null {
   if (!raw) return null;
   return String(raw).replace(/[\s.]/g, '').toUpperCase();
 }
 
-export function isNordwindTaxId(raw) {
+export function isNordwindTaxId(raw: string | null | undefined): boolean {
   const n = normalizeTaxId(raw);
   if (!n) return false;
   const digits = n.replace(/\D/g, '');
@@ -27,7 +27,7 @@ export function isNordwindTaxId(raw) {
   );
 }
 
-export function isNordwindName(name) {
+export function isNordwindName(name: string | null | undefined): boolean {
   if (!name) return false;
   const n = name.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
   return NORDWIND.nameHints.some((h) => n.includes(h));

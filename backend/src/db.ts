@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,8 +18,11 @@ db.exec(schema);
 
 migrate(db);
 
-function migrate(database) {
-  const cols = database.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name);
+function migrate(database: DatabaseType): void {
+  const cols = database
+    .prepare('PRAGMA table_info(invoices)')
+    .all()
+    .map((c) => (c as { name: string }).name);
   if (!cols.includes('stored_path')) {
     database.exec('ALTER TABLE invoices ADD COLUMN stored_path TEXT');
   }

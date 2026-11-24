@@ -1,20 +1,22 @@
+import type { IsoDate } from '../types/domain.js';
+import type { MnbRateRow } from '../types/mnb.js';
+
 const MNB_URL = 'http://www.mnb.hu/arfolyamok.asmx';
 const SOAP_ACTION = 'http://www.mnb.hu/webservices/MNBArfolyamServiceSoap/GetExchangeRates';
 
 /**
  * Parse MNB day/rate XML fragment into rows.
- * @returns {{ date: string, currency: string, unit: number, rate: number }[]}
  */
-export function parseMnbExchangeRatesXml(innerXml) {
+export function parseMnbExchangeRatesXml(innerXml: string): MnbRateRow[] {
   const xml = decodeXmlEntities(String(innerXml || ''));
-  const rows = [];
+  const rows: MnbRateRow[] = [];
   const dayRe = /<Day\s+date="([^"]+)"[^>]*>([\s\S]*?)<\/Day>/gi;
-  let dayMatch;
+  let dayMatch: RegExpExecArray | null;
   while ((dayMatch = dayRe.exec(xml)) !== null) {
     const date = dayMatch[1];
     const body = dayMatch[2];
     const rateRe = /<Rate\s+([^>]+)>([^<]+)<\/Rate>/gi;
-    let rateMatch;
+    let rateMatch: RegExpExecArray | null;
     while ((rateMatch = rateRe.exec(body)) !== null) {
       const attrs = rateMatch[1];
       const unitMatch = attrs.match(/\bunit="([^"]+)"/i);
@@ -34,7 +36,7 @@ export function parseMnbExchangeRatesXml(innerXml) {
   return rows;
 }
 
-function decodeXmlEntities(s) {
+function decodeXmlEntities(s: string): string {
   return s
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -43,7 +45,7 @@ function decodeXmlEntities(s) {
     .replace(/&amp;/g, '&');
 }
 
-function extractResultXml(soapBody) {
+function extractResultXml(soapBody: string): string {
   const m = soapBody.match(
     /<GetExchangeRatesResult[^>]*>([\s\S]*?)<\/GetExchangeRatesResult>/i,
   );
@@ -53,7 +55,7 @@ function extractResultXml(soapBody) {
   return m[1];
 }
 
-function buildEnvelope(startDate, endDate, currencyNames) {
+function buildEnvelope(startDate: string, endDate: string, currencyNames: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="http://www.mnb.hu/webservices/">
   <soap:Body>
@@ -66,16 +68,22 @@ function buildEnvelope(startDate, endDate, currencyNames) {
 </soap:Envelope>`;
 }
 
+export interface FetchExchangeRatesOpts {
+  startDate: IsoDate;
+  endDate: IsoDate;
+  currencies: string[];
+  fetchImpl?: typeof fetch;
+}
+
 /**
  * Fetch exchange rates from MNB (HTTP SOAP).
- * @param {{ startDate: string, endDate: string, currencies: string[], fetchImpl?: typeof fetch }} opts
  */
 export async function fetchExchangeRates({
   startDate,
   endDate,
   currencies,
   fetchImpl = fetch,
-}) {
+}: FetchExchangeRatesOpts): Promise<MnbRateRow[]> {
   const currencyNames = currencies.map((c) => c.toUpperCase()).join(',');
   const body = buildEnvelope(startDate, endDate, currencyNames);
 

@@ -2,10 +2,17 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import multer from 'multer';
 import db from '../db.js';
-import { scheduleProcessPending, processPendingInvoices, processInvoiceById } from '../extraction/processInvoice.js';
+import {
+  scheduleProcessPending,
+  processPendingInvoices,
+  processInvoiceById,
+} from '../extraction/processInvoice.js';
 import { uploadsDir } from '../paths.js';
+import type { UploadResultItem, UploadSummary } from '../types/api.js';
+import type { InvoiceRow } from '../types/invoice.js';
 
 const router = Router();
 
@@ -25,21 +32,21 @@ const upload = multer({
   },
 });
 
-function looksLikePdfName(name) {
+function looksLikePdfName(name: string | undefined): boolean {
   return (name || '').toLowerCase().endsWith('.pdf');
 }
 
-function sha256File(filePath) {
+function sha256File(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256');
     const stream = fs.createReadStream(filePath);
-    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('data', (chunk: Buffer | string) => hash.update(chunk));
     stream.on('end', () => resolve(hash.digest('hex')));
     stream.on('error', reject);
   });
 }
 
-function isPdfMagic(filePath) {
+function isPdfMagic(filePath: string): boolean {
   const fd = fs.openSync(filePath, 'r');
   try {
     const buf = Buffer.alloc(5);
@@ -59,8 +66,12 @@ const invoiceColumns = `
   created_at, updated_at
 `;
 
-const selectInvoice = db.prepare(`SELECT ${invoiceColumns} FROM invoices WHERE id = ?`);
-const selectByHash = db.prepare(`SELECT ${invoiceColumns} FROM invoices WHERE file_hash = ?`);
+const selectInvoice = db.prepare<[number], InvoiceRow>(
+  `SELECT ${invoiceColumns} FROM invoices WHERE id = ?`,
+);
+const selectByHash = db.prepare<[string], InvoiceRow>(
+  `SELECT ${invoiceColumns} FROM invoices WHERE file_hash = ?`,
+);
 const insertPending = db.prepare(`
   INSERT INTO invoices (source_filename, stored_path, file_hash, status, updated_at)
   VALUES (?, ?, ?, 'pending', datetime('now'))
@@ -68,7 +79,7 @@ const insertPending = db.prepare(`
 const insertUploadError = db.prepare(`
   INSERT INTO upload_errors (filename, error_message) VALUES (?, ?)
 `);
-const listInvoices = db.prepare(`
+const listInvoices = db.prepare<[], InvoiceRow>(`
   SELECT ${invoiceColumns} FROM invoices ORDER BY id DESC
 `);
 
@@ -92,20 +103,20 @@ router.post('/:id/process', async (req, res) => {
   res.json(result);
 });
 
-router.post('/upload', (req, res) => {
-  upload.array('files', 120)(req, res, async (err) => {
+router.post('/upload', (req: Request, res: Response) => {
+  upload.array('files', 120)(req, res, async (err: unknown) => {
     if (err) {
-      const message = err.message || 'Upload failed';
+      const message = err instanceof Error ? err.message : 'Upload failed';
       return res.status(400).json({ ok: false, error: message, results: [] });
     }
 
-    const files = req.files || [];
+    const files = (req.files as Express.Multer.File[] | undefined) || [];
     if (files.length === 0) {
       return res.status(400).json({ ok: false, error: 'No files uploaded', results: [] });
     }
 
-    const results = [];
-    let acceptedIds = [];
+    const results: UploadResultItem[] = [];
+    const acceptedIds: number[] = [];
 
     for (const file of files) {
       const original = file.originalname || 'unknown.pdf';
@@ -143,7 +154,10 @@ router.post('/upload', (req, res) => {
         fs.renameSync(tempPath, finalPath);
 
         const info = insertPending.run(original, finalName, hash);
-        const invoice = selectInvoice.get(info.lastInsertRowid);
+        const invoice = selectInvoice.get(Number(info.lastInsertRowid));
+        if (!invoice) {
+          throw new Error('Failed to read inserted invoice');
+        }
         acceptedIds.push(invoice.id);
         results.push({
           filename: original,
@@ -157,7 +171,7 @@ router.post('/upload', (req, res) => {
         } catch {
           /* ignore */
         }
-        const message = e.message || 'Failed to store file';
+        const message = e instanceof Error ? e.message : 'Failed to store file';
         insertUploadError.run(original, message);
         results.push({
           filename: original,
@@ -172,13 +186,16 @@ router.post('/upload', (req, res) => {
       scheduleProcessPending();
     }
 
-    const accepted = results.filter((r) => r.ok && !r.duplicate).length;
-    const duplicates = results.filter((r) => r.duplicate).length;
-    const failed = results.filter((r) => !r.ok).length;
+    const summary: UploadSummary = {
+      accepted: results.filter((r) => r.ok && !r.duplicate).length,
+      duplicates: results.filter((r) => r.ok && r.duplicate).length,
+      failed: results.filter((r) => !r.ok).length,
+      total: results.length,
+    };
 
     res.json({
-      ok: failed === 0,
-      summary: { accepted, duplicates, failed, total: results.length },
+      ok: summary.failed === 0,
+      summary,
       results,
     });
   });
