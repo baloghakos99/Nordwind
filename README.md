@@ -5,8 +5,6 @@ Dockerben futó webalkalmazás: PDF számlák feltöltése, mezőkinyerés, MNB 
 ## Indítás
 
 ```bash
-cp .env.example .env
-# opcionális: OPENROUTER_API_KEY kitöltése (Phase 3+)
 
 docker compose up --build
 ```
@@ -31,7 +29,6 @@ Dockerfile   multi-stage build
 ## Fejlesztés (lokális)
 
 ```bash
-cp .env.example .env   # ha még nincs
 npm install
 npm run dev
 ```
