@@ -3,10 +3,11 @@ import type { UploadResponse, UploadSummary } from '../types';
 
 interface UploadZoneProps {
   onUploaded?: (data: UploadResponse) => void;
+  onUploadState?: (uploading: boolean, label: string | null) => void;
   disabled?: boolean;
 }
 
-export default function UploadZone({ onUploaded, disabled }: UploadZoneProps) {
+export default function UploadZone({ onUploaded, onUploadState, disabled }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -25,6 +26,7 @@ export default function UploadZone({ onUploaded, disabled }: UploadZoneProps) {
     setError(null);
     setUploading(true);
     setLastSummary(null);
+    onUploadState?.(true, `${files.length} PDF feltöltése…`);
 
     try {
       const body = new FormData();
@@ -46,9 +48,10 @@ export default function UploadZone({ onUploaded, disabled }: UploadZoneProps) {
       setError(e instanceof Error ? e.message : 'Feltöltés sikertelen');
     } finally {
       setUploading(false);
+      onUploadState?.(false, null);
       if (inputRef.current) inputRef.current.value = '';
     }
-  }, [onUploaded]);
+  }, [onUploaded, onUploadState]);
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();

@@ -30,8 +30,21 @@ export interface UploadResponse {
   error?: string;
 }
 
+export interface InvoiceStatsDto {
+  total: number;
+  pending: number;
+  processing: number;
+  done: number;
+  error: number;
+  done_rules: number;
+  done_llm: number;
+  busy: number;
+  progress: number;
+}
+
 export interface InvoiceListResponse {
   invoices: InvoiceRow[];
+  stats?: InvoiceStatsDto;
 }
 
 export interface HealthResponse {

@@ -1,54 +1,126 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { Invoice, InvoiceListResponse, PartnerMatrix, MonthlyPoint, ReportResponse } from './types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  Invoice,
+  InvoiceListResponse,
+  InvoiceStats,
+  PartnerMatrix,
+  MonthlyPoint,
+  ReportResponse,
+  UploadResponse,
+} from './types';
 import UploadZone from './components/UploadZone';
+import ProcessingProgress from './components/ProcessingProgress';
 import CashFlowChart from './components/CashFlowChart';
 import PartnerTable from './components/PartnerTable';
 import InvoiceList from './components/InvoiceList';
 
 const emptyPartners: PartnerMatrix = { partners: [], incoming: [], outgoing: [] };
 
+const POLL_BUSY_MS = 800;
+
+function statsFromInvoices(rows: Invoice[]): InvoiceStats {
+  const pending = rows.filter((i) => i.status === 'pending').length;
+  const processing = rows.filter((i) => i.status === 'processing').length;
+  const done = rows.filter((i) => i.status === 'done').length;
+  const error = rows.filter((i) => i.status === 'error').length;
+  const done_rules = rows.filter((i) => i.status === 'done' && i.extraction_method === 'rules').length;
+  const done_llm = rows.filter((i) => i.status === 'done' && i.extraction_method === 'llm').length;
+  const total = rows.length;
+  const busy = pending + processing;
+  return {
+    total,
+    pending,
+    processing,
+    done,
+    error,
+    done_rules,
+    done_llm,
+    busy,
+    progress: total === 0 ? 0 : (done + error) / total,
+  };
+}
+
 export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [months, setMonths] = useState<MonthlyPoint[]>([]);
   const [partners, setPartners] = useState<PartnerMatrix>(emptyPartners);
   const [reportInvoices, setReportInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadLabel, setUploadLabel] = useState<string | null>(null);
+  const wasBusyRef = useRef(false);
 
-  const refresh = useCallback(async () => {
+  const applyList = useCallback((listData: InvoiceListResponse) => {
+    const rows = listData.invoices || [];
+    setInvoices(rows);
+    setStats(listData.stats ?? statsFromInvoices(rows));
+  }, []);
+
+  const refreshList = useCallback(async () => {
     setListError(null);
     try {
-      const [listRes, reportRes] = await Promise.all([
-        fetch('/api/invoices'),
-        fetch('/api/report'),
-      ]);
+      const listRes = await fetch('/api/invoices');
       if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
-      if (!reportRes.ok) throw new Error(`Report HTTP ${reportRes.status}`);
-      const listData = (await listRes.json()) as InvoiceListResponse;
-      const reportData = (await reportRes.json()) as ReportResponse;
-      setInvoices(listData.invoices || []);
-      setMonths(reportData.months || []);
-      setPartners(reportData.partners || emptyPartners);
-      setReportInvoices(reportData.invoices || []);
+      applyList((await listRes.json()) as InvoiceListResponse);
     } catch (e) {
       setListError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
+  }, [applyList]);
+
+  const refreshReport = useCallback(async () => {
+    try {
+      const reportRes = await fetch('/api/report');
+      if (!reportRes.ok) throw new Error(`Report HTTP ${reportRes.status}`);
+      const reportData = (await reportRes.json()) as ReportResponse;
+      setMonths(reportData.months || []);
+      setPartners(reportData.partners || emptyPartners);
+      setReportInvoices(reportData.invoices || []);
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([refreshList(), refreshReport()]);
+  }, [refreshList, refreshReport]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  const busy = uploading || (stats != null && stats.busy > 0);
+
+  // While pipeline busy: poll list often; when it settles, refresh report once
   useEffect(() => {
-    const busy = invoices.some((i) => i.status === 'pending' || i.status === 'processing');
-    if (!busy) return undefined;
+    if (!busy) {
+      if (wasBusyRef.current) {
+        wasBusyRef.current = false;
+        void refresh();
+      }
+      return undefined;
+    }
+    wasBusyRef.current = true;
     const t = setInterval(() => {
-      void refresh();
-    }, 1500);
+      void refreshList();
+    }, POLL_BUSY_MS);
     return () => clearInterval(t);
-  }, [invoices, refresh]);
+  }, [busy, refresh, refreshList]);
+
+  const onUploadState = useCallback((active: boolean, label: string | null) => {
+    setUploading(active);
+    setUploadLabel(label);
+  }, []);
+
+  const onUploaded = useCallback(
+    (_data: UploadResponse) => {
+      void refresh();
+    },
+    [refresh],
+  );
 
   return (
     <div className="min-h-screen px-6 py-16 md:px-12">
@@ -64,10 +136,12 @@ export default function App() {
           fizetési határidő és partner szerint.
         </p>
 
-        <UploadZone
-          onUploaded={() => {
-            void refresh();
-          }}
+        <UploadZone onUploaded={onUploaded} onUploadState={onUploadState} />
+
+        <ProcessingProgress
+          stats={stats}
+          uploading={uploading}
+          uploadLabel={uploadLabel}
         />
 
         {listError && (

@@ -127,6 +127,19 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 - **Fail (példák):** implausible számlaszám (`/`, &lt;3 alnum); dokumentumcím / cím-szerű név (`SZÁMLA / INVOICE`); partner = Nordwind; irány↔Nordwind inkonzisztens; issuer = buyer; dátum nem ISO / ablakon kívül / due&lt;issue / mindhárom egyezik; rossz adószám-formátum ha kitöltve; abszurd gross felső limit.
 - Számlaszám: min. 3 karakter (trim + alfanumerikus).
 
+---
+
+## 2026-11-24 09:37 – Feldolgozás progress (1. lépés)
+
+### Prompt
+> UX javítás két lépésben: (1) folyamatos visszajelzés a feldolgozásról — progress / státusz poll.
+
+### Agent válasz / döntés
+- `GET /api/invoices` most `stats`-ot is ad (pending/processing/done/error, rules/llm, busy, progress).
+- Dedikált `GET /api/invoices/stats`.
+- UI: `ProcessingProgress` sáv + számlálók; feltöltés közben label a UploadZone-ból.
+- Poll: busy / upload közben lista ~800 ms; leálláskor egyszer full report refresh.
+- LLM párhuzamosság (`LLM_CONCURRENCY`) **nincs** ebben a lépésben.
 
 ---
 

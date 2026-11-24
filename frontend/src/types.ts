@@ -46,8 +46,21 @@ export interface UploadResponse {
   error?: string;
 }
 
+export interface InvoiceStats {
+  total: number;
+  pending: number;
+  processing: number;
+  done: number;
+  error: number;
+  done_rules: number;
+  done_llm: number;
+  busy: number;
+  progress: number;
+}
+
 export interface InvoiceListResponse {
   invoices: Invoice[];
+  stats?: InvoiceStats;
 }
 
 export interface MonthlyPoint {

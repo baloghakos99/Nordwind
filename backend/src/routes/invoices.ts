@@ -11,6 +11,7 @@ import {
   processInvoiceById,
 } from '../extraction/processInvoice.js';
 import { uploadsDir } from '../paths.js';
+import { buildInvoiceStats } from '../aggregation/stats.js';
 import type { UploadResultItem, UploadSummary } from '../types/api.js';
 import type { InvoiceRow } from '../types/invoice.js';
 
@@ -84,7 +85,13 @@ const listInvoices = db.prepare<[], InvoiceRow>(`
 `);
 
 router.get('/', (_req, res) => {
-  res.json({ invoices: listInvoices.all() });
+  const invoices = listInvoices.all();
+  res.json({ invoices, stats: buildInvoiceStats(invoices) });
+});
+
+router.get('/stats', (_req, res) => {
+  const invoices = listInvoices.all();
+  res.json({ ok: true, stats: buildInvoiceStats(invoices) });
 });
 
 router.get('/:id', (req, res) => {
