@@ -115,6 +115,18 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 - `GET /api/report`; UI: SVG vonaldiagram → partner tábla → részletes számlalista.
 - Aggregáció unit tesztek zöldek; frontend/backend typecheck OK.
 
+---
+
+## 2026-11-24 09:11 – Validáció quality gate → LLM (regex érintetlen)
+
+### Prompt
+> NWS számla: invoice_number=`/`, partner=`SZÁMLA / INVOICE` — ne a kinyerési szabályokat javítsd először; validációnál szűrd ki, és küldd LLM ágra. Később: további gate-ek (irány, dátum, adószám) is mehetnek.
+
+### Agent válasz / döntés
+- **Elfogadva:** quality gate a `validateExtraction`-ben; extrakciós regexek változatlanok. `ok === false` → meglévő LLM fallback.
+- **Fail (példák):** implausible számlaszám (`/`, &lt;3 alnum); dokumentumcím / cím-szerű név (`SZÁMLA / INVOICE`); partner = Nordwind; irány↔Nordwind inkonzisztens; issuer = buyer; dátum nem ISO / ablakon kívül / due&lt;issue / mindhárom egyezik; rossz adószám-formátum ha kitöltve; abszurd gross felső limit.
+- Számlaszám: min. 3 karakter (trim + alfanumerikus).
+
 
 ---
 
