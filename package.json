@@ -11,7 +11,8 @@
     "dev:backend": "npm run dev -w nordwind-backend",
     "dev:frontend": "npm run dev -w nordwind-frontend",
     "build": "npm run build -w nordwind-frontend",
-    "start": "npm run start -w nordwind-backend"
+    "start": "npm run start -w nordwind-backend",
+    "test": "npm run test -w nordwind-backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

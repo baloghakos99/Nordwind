@@ -4,13 +4,14 @@ import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
 import db from '../db.js';
+import { scheduleProcessPending, processPendingInvoices, processInvoiceById } from '../extraction/processInvoice.js';
 import { uploadsDir } from '../paths.js';
 
 const router = Router();
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
+  filename: (_req, _file, cb) => {
     const safe = `${Date.now()}-${Math.random().toString(36).slice(2)}.upload`;
     cb(null, safe);
   },
@@ -49,41 +50,46 @@ function isPdfMagic(filePath) {
   }
 }
 
-const selectInvoice = db.prepare(`
-  SELECT id, source_filename, stored_path, file_hash, status, error_message,
-         invoice_number, issuer_name, currency, gross_amount, direction,
-         created_at, updated_at
-  FROM invoices
-  WHERE id = ?
-`);
+const invoiceColumns = `
+  id, source_filename, stored_path, file_hash, status, error_message,
+  invoice_number, issuer_name, issuer_tax_id, buyer_name, buyer_tax_id,
+  issue_date, fulfillment_date, due_date, currency, gross_amount,
+  direction, partner_name, partner_tax_id,
+  mnb_rate, mnb_rate_date, amount_huf,
+  created_at, updated_at
+`;
 
-const selectByHash = db.prepare(`
-  SELECT id, source_filename, stored_path, file_hash, status, error_message,
-         invoice_number, issuer_name, currency, gross_amount, direction,
-         created_at, updated_at
-  FROM invoices
-  WHERE file_hash = ?
-`);
-
+const selectInvoice = db.prepare(`SELECT ${invoiceColumns} FROM invoices WHERE id = ?`);
+const selectByHash = db.prepare(`SELECT ${invoiceColumns} FROM invoices WHERE file_hash = ?`);
 const insertPending = db.prepare(`
   INSERT INTO invoices (source_filename, stored_path, file_hash, status, updated_at)
   VALUES (?, ?, ?, 'pending', datetime('now'))
 `);
-
 const insertUploadError = db.prepare(`
   INSERT INTO upload_errors (filename, error_message) VALUES (?, ?)
 `);
-
 const listInvoices = db.prepare(`
-  SELECT id, source_filename, stored_path, file_hash, status, error_message,
-         invoice_number, issuer_name, currency, gross_amount, direction,
-         created_at, updated_at
-  FROM invoices
-  ORDER BY id DESC
+  SELECT ${invoiceColumns} FROM invoices ORDER BY id DESC
 `);
 
 router.get('/', (_req, res) => {
   res.json({ invoices: listInvoices.all() });
+});
+
+router.get('/:id', (req, res) => {
+  const invoice = selectInvoice.get(Number(req.params.id));
+  if (!invoice) return res.status(404).json({ error: 'Not found' });
+  res.json({ invoice });
+});
+
+router.post('/process', async (_req, res) => {
+  const result = await processPendingInvoices();
+  res.json({ ok: true, ...result, invoices: listInvoices.all() });
+});
+
+router.post('/:id/process', async (req, res) => {
+  const result = await processInvoiceById(Number(req.params.id));
+  res.json(result);
 });
 
 router.post('/upload', (req, res) => {
@@ -99,6 +105,7 @@ router.post('/upload', (req, res) => {
     }
 
     const results = [];
+    let acceptedIds = [];
 
     for (const file of files) {
       const original = file.originalname || 'unknown.pdf';
@@ -137,6 +144,7 @@ router.post('/upload', (req, res) => {
 
         const info = insertPending.run(original, finalName, hash);
         const invoice = selectInvoice.get(info.lastInsertRowid);
+        acceptedIds.push(invoice.id);
         results.push({
           filename: original,
           ok: true,
@@ -147,7 +155,7 @@ router.post('/upload', (req, res) => {
         try {
           if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         } catch {
-          /* ignore cleanup */
+          /* ignore */
         }
         const message = e.message || 'Failed to store file';
         insertUploadError.run(original, message);
@@ -158,6 +166,10 @@ router.post('/upload', (req, res) => {
           error: message,
         });
       }
+    }
+
+    if (acceptedIds.length > 0) {
+      scheduleProcessPending();
     }
 
     const accepted = results.filter((r) => r.ok && !r.duplicate).length;

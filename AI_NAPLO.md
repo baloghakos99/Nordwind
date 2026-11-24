@@ -59,3 +59,20 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 - UI: drag & drop + file picker, státuszlista.
 - Smoke test: 2 új + 1 hibás + 1 duplikátum → várt summary.
 
+---
+
+## 2026-11-24 07:04 – Phase 3: szabályalapú adatkinyerés
+
+### Prompt
+> Készítsd el a 3. pontot (adatkinyerés), add a naplóhoz. 3 különböző számla feltöltve a UI-n. LLM nélkül, szabályokkal.
+
+### Agent válasz / döntés
+- **Elfogadva:** elsődleges szabályalapú pipeline, LLM nincs (FELADAT előny).
+- PDF szöveg: `pdf-parse` (PDFParse), többoldalas szöveg összefűzve.
+- Címke-szótárak + `parseDate` / `parseAmount` + Nordwind irány (adószám/név).
+- Validáció kötelező mezőkre; fail → `error` státusz üzenettel.
+- Üzleti duplikátum: `issuer_tax_id` + `invoice_number` → megtartjuk az elsőt.
+- Feltöltés után / induláskor `scheduleProcessPending`.
+---
+
+

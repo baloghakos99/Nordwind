@@ -45,8 +45,13 @@ Együtt fut a backend (`node --watch`) és a frontend (Vite) a gyökér `concurr
 
 - [x] Phase 1 – skeleton
 - [x] Phase 2 – bulk PDF upload
-- [ ] Phase 3 – extraction
+- [x] Phase 3 – extraction (rule-based, no LLM)
 - [ ] Phase 4 – MNB FX
 - [ ] Phase 5 – report UI
 
+### Adatkinyerés (Phase 3)
+
+Szabályalapú: PDF szöveg → címke-szótárak (HU/DE/EN+…) + dátum/összeg parser + Nordwind irány.
+Validáció kötelező mezőkre; feltöltés után háttérben fut (`pending` → `done`/`error`).
+LLM tartalék nincs bekapcsolva (a feladat szerint előny).
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.

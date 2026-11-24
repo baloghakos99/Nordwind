@@ -25,6 +25,14 @@ export default function App() {
     refresh();
   }, [refresh]);
 
+  // Poll while any invoice is still pending/processing (extraction queue)
+  useEffect(() => {
+    const busy = invoices.some((i) => i.status === 'pending' || i.status === 'processing');
+    if (!busy) return undefined;
+    const t = setInterval(refresh, 1500);
+    return () => clearInterval(t);
+  }, [invoices, refresh]);
+
   return (
     <div className="min-h-screen px-6 py-16 md:px-12">
       <main className="mx-auto max-w-3xl">
@@ -35,8 +43,8 @@ export default function App() {
           Számla cash-flow
         </h1>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-[var(--nw-ink)]/75">
-          Tölts fel PDF számlákat. A fájlok megmaradnak, a kimutatás a
-          feldolgozás után készül el.
+          Tölts fel PDF számlákat. A mezőket szabályalapú kinyerés tölti ki;
+          a forintos kimutatás a következő fázisokban jön.
         </p>
 
         <UploadZone onUploaded={() => refresh()} />

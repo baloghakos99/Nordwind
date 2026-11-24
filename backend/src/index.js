@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db from './db.js';
+import { scheduleProcessPending } from './extraction/processInvoice.js';
 import './paths.js';
 import invoicesRouter from './routes/invoices.js';
 
@@ -39,4 +40,5 @@ if (fs.existsSync(frontendDist)) {
 
 app.listen(PORT, () => {
   console.log(`Nordwind listening on http://0.0.0.0:${PORT}`);
+  scheduleProcessPending();
 });

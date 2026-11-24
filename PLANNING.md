@@ -65,8 +65,10 @@ Számlaszám; kiállító/vevő név+adószám; kiállítás dátuma; **teljesí
 - Tesztek: mezőkinyerés mintákon
 
 ### Acceptance
-- Ismert mezők struktúráltan a DB-ben
-- Fájlnévre nem támaszkodik; új sablonokra sem bedrótozott
+- [x] Ismert mezők struktúráltan a DB-ben
+- [x] Fájlnévre nem támaszkodik; új sablonokra sem bedrótozott
+
+**Állapot:** kész (2026-11-24) — szabályalapú extrakció (nincs LLM); HU/DE/EN mintákon `done`; unit tesztek
 
 ---
 
