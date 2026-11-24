@@ -3,6 +3,7 @@ import path from 'node:path';
 import db from '../db.js';
 import { uploadsDir } from '../paths.js';
 import { extractInvoiceFromText } from './extractInvoice.js';
+import { extractInvoiceWithLlm, isLlmConfigured } from './llmExtract.js';
 import { extractPdfText } from './pdfText.js';
 import { validateExtraction } from './validate.js';
 
@@ -29,6 +30,7 @@ const updateExtracted = db.prepare(`
     direction = ?,
     partner_name = ?,
     partner_tax_id = ?,
+    extraction_method = ?,
     status = ?,
     error_message = ?,
     updated_at = datetime('now')
@@ -57,12 +59,52 @@ function resolvePdfPath(row) {
   return path.join(uploadsDir, row.stored_path);
 }
 
+function persistFields(id, fields, method, status, errorMessage) {
+  updateExtracted.run(
+    fields.invoice_number,
+    fields.issuer_name,
+    fields.issuer_tax_id,
+    fields.buyer_name,
+    fields.buyer_tax_id,
+    fields.issue_date,
+    fields.fulfillment_date,
+    fields.due_date,
+    fields.currency,
+    fields.gross_amount,
+    fields.direction,
+    fields.partner_name,
+    fields.partner_tax_id,
+    method,
+    status,
+    errorMessage,
+    id,
+  );
+}
+
+function handleDupe(id, fields) {
+  if (!fields.issuer_tax_id || !fields.invoice_number) return null;
+  const dupe = findBusinessDupe.get(id, fields.issuer_tax_id, fields.invoice_number);
+  if (!dupe) return null;
+  deleteById.run(id);
+  return {
+    ok: true,
+    duplicate: true,
+    duplicateOf: dupe.id,
+    invoice: getById.get(dupe.id),
+  };
+}
+
 /**
- * Extract fields for one invoice row. Returns updated row snapshot.
+ * Extract fields for one invoice row. Rules first; LLM only if validation fails.
  */
 export async function processInvoiceById(id) {
   const row = getById.get(id);
   if (!row) return { ok: false, error: 'Not found' };
+
+  // Already successfully extracted — do not call LLM again (token saver)
+  if (row.status === 'done' && row.extraction_method) {
+    return { ok: true, invoice: row, skipped: true };
+  }
 
   setStatus.run('processing', null, id);
 
@@ -79,63 +121,104 @@ export async function processInvoiceById(id) {
       return { ok: false, invoice: getById.get(id) };
     }
 
-    const fields = extractInvoiceFromText(text);
-    const validation = validateExtraction(fields);
+    const ruleFields = extractInvoiceFromText(text);
+    const ruleValidation = validateExtraction(ruleFields);
 
-    if (!validation.ok) {
-      updateExtracted.run(
-        fields.invoice_number,
-        fields.issuer_name,
-        fields.issuer_tax_id,
-        fields.buyer_name,
-        fields.buyer_tax_id,
-        fields.issue_date,
-        fields.fulfillment_date,
-        fields.due_date,
-        fields.currency,
-        fields.gross_amount,
-        fields.direction,
-        fields.partner_name,
-        fields.partner_tax_id,
-        'error',
-        validation.errors.join('; '),
+    if (ruleValidation.ok) {
+      const dupe = handleDupe(id, ruleFields);
+      if (dupe) return dupe;
+
+      persistFields(
         id,
+        ruleFields,
+        'rules',
+        'done',
+        ruleValidation.warnings.length ? ruleValidation.warnings.join('; ') : null,
       );
-      return { ok: false, invoice: getById.get(id), fields, validation };
-    }
-
-    const dupe = findBusinessDupe.get(id, fields.issuer_tax_id, fields.invoice_number);
-    if (dupe) {
-      // Keep the first invoice; drop this upload row (hash already unique so this is rare)
-      deleteById.run(id);
       return {
         ok: true,
-        duplicate: true,
-        duplicateOf: dupe.id,
-        invoice: getById.get(dupe.id),
+        invoice: getById.get(id),
+        fields: ruleFields,
+        validation: ruleValidation,
+        extraction_method: 'rules',
       };
     }
 
-    updateExtracted.run(
-      fields.invoice_number,
-      fields.issuer_name,
-      fields.issuer_tax_id,
-      fields.buyer_name,
-      fields.buyer_tax_id,
-      fields.issue_date,
-      fields.fulfillment_date,
-      fields.due_date,
-      fields.currency,
-      fields.gross_amount,
-      fields.direction,
-      fields.partner_name,
-      fields.partner_tax_id,
-      'done',
-      validation.warnings.length ? validation.warnings.join('; ') : null,
+    // --- LLM fallback ---
+    if (!isLlmConfigured()) {
+      persistFields(
+        id,
+        ruleFields,
+        null,
+        'error',
+        `Rules failed (${ruleValidation.errors.join('; ')}); OPENROUTER_API_KEY not set for LLM fallback`,
+      );
+      return {
+        ok: false,
+        invoice: getById.get(id),
+        fields: ruleFields,
+        validation: ruleValidation,
+      };
+    }
+
+    let llmFields;
+    let llmModel;
+    try {
+      const llm = await extractInvoiceWithLlm(text, {
+        partial: ruleFields,
+        ruleErrors: ruleValidation.errors,
+      });
+      llmFields = llm.fields;
+      llmModel = llm.model;
+    } catch (e) {
+      persistFields(
+        id,
+        ruleFields,
+        null,
+        'error',
+        `Rules failed; LLM error: ${e.message}`,
+      );
+      return { ok: false, invoice: getById.get(id), error: e.message };
+    }
+
+    const llmValidation = validateExtraction(llmFields);
+    if (!llmValidation.ok) {
+      persistFields(
+        id,
+        llmFields,
+        'llm',
+        'error',
+        `LLM (${llmModel}) invalid: ${llmValidation.errors.join('; ')}`,
+      );
+      return {
+        ok: false,
+        invoice: getById.get(id),
+        fields: llmFields,
+        validation: llmValidation,
+        extraction_method: 'llm',
+      };
+    }
+
+    const dupe = handleDupe(id, llmFields);
+    if (dupe) return dupe;
+
+    persistFields(
       id,
+      llmFields,
+      'llm',
+      'done',
+      llmValidation.warnings.length
+        ? `LLM ${llmModel}; ${llmValidation.warnings.join('; ')}`
+        : `LLM ${llmModel}`,
     );
 
-    return { ok: true, invoice: getById.get(id), fields, validation };
+    return {
+      ok: true,
+      invoice: getById.get(id),
+      fields: llmFields,
+      validation: llmValidation,
+      extraction_method: 'llm',
+    };
   } catch (e) {
     setStatus.run('error', e.message || 'Extraction failed', id);
     return { ok: false, invoice: getById.get(id), error: e.message };

@@ -54,7 +54,7 @@ const invoiceColumns = `
   id, source_filename, stored_path, file_hash, status, error_message,
   invoice_number, issuer_name, issuer_tax_id, buyer_name, buyer_tax_id,
   issue_date, fulfillment_date, due_date, currency, gross_amount,
-  direction, partner_name, partner_tax_id,
+  direction, partner_name, partner_tax_id, extraction_method,
   mnb_rate, mnb_rate_date, amount_huf,
   created_at, updated_at
 `;

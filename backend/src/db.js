@@ -22,6 +22,15 @@ function migrate(database) {
   if (!cols.includes('stored_path')) {
     database.exec('ALTER TABLE invoices ADD COLUMN stored_path TEXT');
   }
+  if (!cols.includes('extraction_method')) {
+    database.exec('ALTER TABLE invoices ADD COLUMN extraction_method TEXT');
+  }
+  // Backfill: successful extractions before LLM branch were rules-only
+  database.exec(`
+    UPDATE invoices
+    SET extraction_method = 'rules'
+    WHERE status = 'done' AND extraction_method IS NULL
+  `);
 }
 
 export default db;

@@ -10,6 +10,11 @@ const DIRECTION_LABEL = {
   outgoing: 'kimenő',
 };
 
+const METHOD_LABEL = {
+  rules: 'szabályok',
+  llm: 'LLM',
+};
+
 function formatAmount(inv) {
   if (inv.gross_amount == null) return '—';
   const n = Number(inv.gross_amount);
@@ -18,6 +23,13 @@ function formatAmount(inv) {
     maximumFractionDigits: 2,
   }).format(n);
   return `${formatted} ${inv.currency || ''}`.trim();
+}
+
+function methodBadge(inv) {
+  if (inv.status !== 'done' && inv.status !== 'error') return null;
+  const method = inv.extraction_method;
+  if (!method) return null;
+  return METHOD_LABEL[method] || method;
 }
 
 export default function InvoiceList({ invoices, loading }) {
@@ -38,40 +50,54 @@ export default function InvoiceList({ invoices, loading }) {
 
       {invoices.length > 0 && (
         <ul className="mt-4 divide-y divide-[var(--nw-ink)]/10 border-t border-[var(--nw-ink)]/15">
-          {invoices.map((inv) => (
-            <li key={inv.id} className="py-4">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {inv.invoice_number || inv.source_filename || `invoice #${inv.id}`}
-                  </p>
-                  <p className="mt-0.5 text-sm text-[var(--nw-ink)]/70">
-                    {inv.partner_name || inv.issuer_name || '—'}
-                    {inv.direction ? ` · ${DIRECTION_LABEL[inv.direction] || inv.direction}` : ''}
-                  </p>
-                  <p className="mt-1 font-mono text-xs text-[var(--nw-ink)]/45">
-                    #{inv.id}
-                    {inv.fulfillment_date ? ` · teljesítés ${inv.fulfillment_date}` : ''}
-                    {inv.due_date ? ` · határidő ${inv.due_date}` : ''}
-                  </p>
-                  {inv.error_message && inv.status === 'error' && (
-                    <p className="mt-1 text-sm text-red-800">{inv.error_message}</p>
-                  )}
+          {invoices.map((inv) => {
+            const method = methodBadge(inv);
+            return (
+              <li key={inv.id} className="py-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
+                      {inv.invoice_number || inv.source_filename || `invoice #${inv.id}`}
+                    </p>
+                    <p className="mt-0.5 text-sm text-[var(--nw-ink)]/70">
+                      {inv.partner_name || inv.issuer_name || '—'}
+                      {inv.direction ? ` · ${DIRECTION_LABEL[inv.direction] || inv.direction}` : ''}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-[var(--nw-ink)]/45">
+                      #{inv.id}
+                      {inv.fulfillment_date ? ` · teljesítés ${inv.fulfillment_date}` : ''}
+                      {inv.due_date ? ` · határidő ${inv.due_date}` : ''}
+                    </p>
+                    {method && (
+                      <p className="mt-1 text-xs text-[var(--nw-ink)]/55">
+                        Kinyerés:{' '}
+                        <span className={method === 'LLM' ? 'text-[var(--nw-sky)]' : ''}>
+                          {method === 'LLM'
+                            ? 'LLM tartalék (szabályok nem voltak elegendőek)'
+                            : 'szabályok alapján'}
+                        </span>
+                      </p>
+                    )}
+                    {inv.error_message && inv.status === 'error' && (
+                      <p className="mt-1 text-sm text-red-800">{inv.error_message}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-medium">{formatAmount(inv)}</p>
+                    <p
+                      className={[
+                        'mt-1 text-sm',
+                        inv.status === 'error' ? 'text-red-800' : 'text-[var(--nw-ink)]/70',
+                      ].join(' ')}
+                    >
+                      {STATUS_LABEL[inv.status] || inv.status}
+                      {method ? ` · ${method}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-medium">{formatAmount(inv)}</p>
-                  <p
-                    className={[
-                      'mt-1 text-sm',
-                      inv.status === 'error' ? 'text-red-800' : 'text-[var(--nw-ink)]/70',
-                    ].join(' ')}
-                  >
-                    {STATUS_LABEL[inv.status] || inv.status}
-                  </p>
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

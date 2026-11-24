@@ -1,3 +1,5 @@
+import './loadEnv.js';
+
 import cors from 'cors';
 import express from 'express';
 import fs from 'node:fs';
@@ -21,6 +23,7 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     service: 'nordwind',
     invoices: invoiceCount,
+    llm: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
   });
 });
 
@@ -40,5 +43,8 @@ if (fs.existsSync(frontendDist)) {
 
 app.listen(PORT, () => {
   console.log(`Nordwind listening on http://0.0.0.0:${PORT}`);
+  if (!process.env.OPENROUTER_API_KEY?.trim()) {
+    console.warn('OPENROUTER_API_KEY missing — LLM fallback disabled');
+  }
   scheduleProcessPending();
 });

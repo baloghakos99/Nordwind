@@ -73,6 +73,20 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 - Validáció kötelező mezőkre; fail → `error` státusz üzenettel.
 - Üzleti duplikátum: `issuer_tax_id` + `invoice_number` → megtartjuk az elsőt.
 - Feltöltés után / induláskor `scheduleProcessPending`.
+
+---
+
+## 2026-11-24 07:26 – LLM tartalékág (OpenRouter) + UI jelölés
+
+### Prompt
+> Csináld meg az LLM ágat; a listán írjuk ki, szabályok vagy LLM nyerte-e ki az adatot. Modell: olcsó flash/mini, csak fail esetén.
+
+### Agent válasz / döntés
+- **Elfogadva:** rules → validate; fail esetén OpenRouter (`google/gemini-2.5-flash` default).
+- `extraction_method`: `rules` | `llm`; UI: „szabályok alapján” / „LLM tartalék…”.
+- Tokenkímélés: nincs kulcs → error rules üzenettel; `done` + method → skip; szöveg truncate ~12k.
+- Kulcs csak `.env` / env var — nem a repóba.
+
 ---
 
 

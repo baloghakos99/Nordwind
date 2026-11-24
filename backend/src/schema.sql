@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   source_filename TEXT,
   stored_path TEXT,
   file_hash TEXT,
+  extraction_method TEXT
+    CHECK (extraction_method IN ('rules', 'llm') OR extraction_method IS NULL),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'done', 'error')),
   error_message TEXT,

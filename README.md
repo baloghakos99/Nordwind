@@ -51,7 +51,8 @@ Együtt fut a backend (`node --watch`) és a frontend (Vite) a gyökér `concurr
 
 ### Adatkinyerés (Phase 3)
 
-Szabályalapú: PDF szöveg → címke-szótárak (HU/DE/EN+…) + dátum/összeg parser + Nordwind irány.
-Validáció kötelező mezőkre; feltöltés után háttérben fut (`pending` → `done`/`error`).
-LLM tartalék nincs bekapcsolva (a feladat szerint előny).
+1. **Szabályok** (elsődleges): PDF szöveg → címke-szótárak + dátum/összeg parser + Nordwind irány + validáció.
+2. **LLM tartalék** (csak ha a validáció elbukik): OpenRouter (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, default `google/gemini-2.5-flash`).
+   - Már `done` számlát nem küldjük újra.
+   - A listában látszik: *szabályok alapján* / *LLM tartalék*.
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.
