@@ -4,18 +4,22 @@ interface ProcessingProgressProps {
   stats: InvoiceStats | null;
   uploading?: boolean;
   uploadLabel?: string | null;
+  /** True while a single-invoice retry is in flight */
+  retrying?: boolean;
 }
 
 export default function ProcessingProgress({
   stats,
   uploading = false,
   uploadLabel = null,
+  retrying = false,
 }: ProcessingProgressProps) {
-  if (!stats && !uploading) return null;
-  if (stats && stats.total === 0 && !uploading) return null;
+  const queueBusy = stats != null && stats.busy > 0;
+  // Show for current batch (incl. after done/error), upload, or retry; hide after page refresh (no stats)
+  if (!uploading && !retrying && !stats) return null;
 
   const pct = stats ? Math.round(stats.progress * 100) : 0;
-  const busy = uploading || (stats != null && stats.busy > 0);
+  const busy = uploading || retrying || queueBusy;
 
   return (
     <section className="mt-8" aria-live="polite">

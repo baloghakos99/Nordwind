@@ -38,9 +38,19 @@ interface InvoiceListProps {
   /** Report subset (done + HUF) — if provided, shown as detailed table */
   reportInvoices?: Invoice[];
   loading: boolean;
+  /** Re-run extraction for a failed invoice */
+  onRetry?: (id: number) => void;
+  /** Invoice id currently being retried */
+  retryingId?: number | null;
 }
 
-export default function InvoiceList({ invoices, reportInvoices, loading }: InvoiceListProps) {
+export default function InvoiceList({
+  invoices,
+  reportInvoices,
+  loading,
+  onRetry,
+  retryingId = null,
+}: InvoiceListProps) {
   const detail = reportInvoices && reportInvoices.length > 0 ? reportInvoices : null;
   const pendingOrError = invoices.filter((i) => i.status !== 'done');
 
@@ -145,19 +155,36 @@ export default function InvoiceList({ invoices, reportInvoices, loading }: Invoi
             Feldolgozás / hibák
           </h3>
           <ul className="mt-2 divide-y divide-[var(--nw-ink)]/10">
-            {pendingOrError.map((inv) => (
-              <li key={inv.id} className="flex justify-between gap-4 py-2 text-sm">
-                <span className="truncate">
-                  {inv.source_filename || `invoice #${inv.id}`}
-                  {inv.error_message ? (
-                    <span className="mt-0.5 block text-red-800">{inv.error_message}</span>
-                  ) : null}
-                </span>
-                <span className={inv.status === 'error' ? 'text-red-800' : 'text-[var(--nw-ink)]/60'}>
-                  {STATUS_LABEL[inv.status]}
-                </span>
-              </li>
-            ))}
+            {pendingOrError.map((inv) => {
+              const isRetrying = retryingId === inv.id;
+              return (
+                <li key={inv.id} className="flex items-start justify-between gap-4 py-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate">
+                    {inv.source_filename || `invoice #${inv.id}`}
+                    {inv.error_message ? (
+                      <span className="mt-0.5 block whitespace-normal text-red-800">
+                        {inv.error_message}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    {inv.status === 'error' && onRetry ? (
+                      <button
+                        type="button"
+                        disabled={isRetrying}
+                        onClick={() => onRetry(inv.id)}
+                        className="cursor-pointer text-[var(--nw-sky)] underline-offset-2 hover:underline disabled:cursor-wait disabled:opacity-60 disabled:no-underline"
+                      >
+                        {isRetrying ? 'újra…' : 'Újra'}
+                      </button>
+                    ) : null}
+                    <span className={inv.status === 'error' ? 'text-red-800' : 'text-[var(--nw-ink)]/60'}>
+                      {STATUS_LABEL[inv.status]}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

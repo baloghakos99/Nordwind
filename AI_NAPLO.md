@@ -197,13 +197,39 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 ## 2026-11-24 11:08 – LLM válasz ellenőrzés (FELADAT)
 
 ### Prompt
-> FELADAT: ha LLM-et használsz, írd le / ellenőrizd a választ (séma, összeg-egyezés). Ilyen még nem volt — mehet.
+> FELADAT: ha LLM-et használsz, írd le / ellenőrizd a választ (séma, összeg-egyezés).
 
 ### Agent válasz / döntés
 - `assertLlmJsonShape`: kötelező kulcsok + direction/gross típus.
 - `crossCheckLlmAgainstSource`: számlaszám / currency / gross a PDF szövegben (nincs tételsor → nincs sorösszeg↔totál).
 - Pipeline: shape → normalize → `validateExtraction` → cross-check; fail → `error`.
 - README + unit tesztek.
+
+---
+
+## 2026-11-24 12:09 – LLM soft check: tételsor + ÁFA ≈ bruttó
+
+### Prompt
+> LLM a „sorok összege = végösszeg”? → A: opcionális LLM soft check. Majd: ÁFA külön sorban / %-ban is legyen figyelembe véve (HU példa: nettó 198360 + ÁFA 53557 = 251917).
+
+### Agent válasz / döntés
+- Elvetve: teljes rules tételsor-parse (lassú, törékeny EU-sablonokra).
+- Elfogadva: LLM-only soft check — opcionális `line_item_amounts` + `vat_amount`; `sum(tételek)+vat ≈ gross` (tol max(1, 1%)).
+- Manuális teszt: `FORCE_LLM` + `console.log` → logban látszott a nettó≠bruttó; ÁFA mező után debug kikerült.
+- Pipeline gate: shape → validate → forrás cross-check → line+vat soft check; fail → `error`.
+- Tesztek (HU-style nettó+ÁFA) + README frissítés.
+
+---
+
+## 2026-11-24 12:23 – Hibás számla: Újra gomb
+
+### Prompt
+> Hibakezelés: ha nem olvasható be a számla? → javaslat után: csináld meg a retry gombot.
+
+### Agent válasz / döntés
+- Már megvolt: `status=error` + üzenet, kimutatásból kimarad; API: `POST /:id/process`.
+- UI: hibás soroknál **Újra** → újrafuttatás + lista/report refresh; README.
+- Nem csináltunk: kézi mezőszerkesztés / OCR (overkill a feladathoz).
 
 ---
 

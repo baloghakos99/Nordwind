@@ -39,10 +39,26 @@ export interface UploadSummary {
   total: number;
 }
 
+export interface UploadResultOk {
+  filename: string;
+  ok: true;
+  duplicate: boolean;
+  invoice: Invoice;
+}
+
+export interface UploadResultFail {
+  filename: string;
+  ok: false;
+  duplicate: false;
+  error: string;
+}
+
+export type UploadResultItem = UploadResultOk | UploadResultFail;
+
 export interface UploadResponse {
   ok: boolean;
   summary?: UploadSummary;
-  results?: unknown[];
+  results?: UploadResultItem[];
   error?: string;
 }
 

@@ -58,6 +58,9 @@ export default function App() {
   const [listError, setListError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadLabel, setUploadLabel] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  /** Invoice ids for the current upload/retry progress (null = hide after idle/refresh) */
+  const [progressIds, setProgressIds] = useState<number[] | null>(null);
   const wasBusyRef = useRef(false);
 
   const applyList = useCallback((listData: InvoiceListResponse) => {
@@ -124,10 +127,34 @@ export default function App() {
     return filterPartnerMatrix(allPartners, selectedPartner.key);
   }, [selectedPartner, allPartners]);
 
-  const busy = uploading || (stats != null && stats.busy > 0);
+  const progressStats = useMemo(() => {
+    if (!progressIds || progressIds.length === 0) return null;
+    const idSet = new Set(progressIds);
+    const rows = invoices.filter((i) => idSet.has(i.id));
+    // Until list refresh catches up, keep a placeholder total so the bar stays visible
+    if (rows.length === 0) {
+      return {
+        total: progressIds.length,
+        pending: progressIds.length,
+        processing: 0,
+        done: 0,
+        error: 0,
+        done_rules: 0,
+        done_llm: 0,
+        busy: progressIds.length,
+        progress: 0,
+      } satisfies InvoiceStats;
+    }
+    return statsFromInvoices(rows);
+  }, [invoices, progressIds]);
+
+  const batchBusy = progressStats != null && progressStats.busy > 0;
+  const pipelineBusy = uploading || retryingId != null || batchBusy
+    || (stats != null && stats.busy > 0);
+  // progressIds stays until refresh or next upload/retry — block remains visible when batch finishes
 
   useEffect(() => {
-    if (!busy) {
+    if (!pipelineBusy) {
       if (wasBusyRef.current) {
         wasBusyRef.current = false;
         void refresh();
@@ -139,7 +166,7 @@ export default function App() {
       void refreshList();
     }, POLL_BUSY_MS);
     return () => clearInterval(t);
-  }, [busy, refresh, refreshList]);
+  }, [pipelineBusy, refresh, refreshList]);
 
   const onUploadState = useCallback((active: boolean, label: string | null) => {
     setUploading(active);
@@ -147,10 +174,34 @@ export default function App() {
   }, []);
 
   const onUploaded = useCallback(
-    (_data: UploadResponse) => {
+    (data: UploadResponse) => {
+      const acceptedIds: number[] = [];
+      for (const r of data.results || []) {
+        if (r.ok && !r.duplicate && r.invoice?.id != null) acceptedIds.push(r.invoice.id);
+      }
+      if (acceptedIds.length > 0) setProgressIds(acceptedIds);
       void refresh();
     },
     [refresh],
+  );
+
+  const onRetry = useCallback(
+    async (id: number) => {
+      setProgressIds([id]);
+      setRetryingId(id);
+      setListError(null);
+      try {
+        const res = await fetch(`/api/invoices/${id}/process`, { method: 'POST' });
+        if (!res.ok) throw new Error(`Retry HTTP ${res.status}`);
+        await refresh();
+      } catch (e) {
+        setListError(e instanceof Error ? e.message : String(e));
+        await refreshList();
+      } finally {
+        setRetryingId(null);
+      }
+    },
+    [refresh, refreshList],
   );
 
   return (
@@ -170,9 +221,10 @@ export default function App() {
         <UploadZone onUploaded={onUploaded} onUploadState={onUploadState} />
 
         <ProcessingProgress
-          stats={stats}
+          stats={progressStats}
           uploading={uploading}
           uploadLabel={uploadLabel}
+          retrying={retryingId != null}
         />
 
         {listError && (
@@ -191,6 +243,8 @@ export default function App() {
           invoices={invoices}
           reportInvoices={filteredReportInvoices}
           loading={loading}
+          onRetry={(id) => void onRetry(id)}
+          retryingId={retryingId}
         />
       </main>
     </div>

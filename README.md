@@ -74,6 +74,7 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 
 - `GET /api/report` — havi sorozat (due date), partner mátrix (adószám), forintosított számlák.
 - UI sorrend: diagram → cégenkénti tábla → számlalista (SQLite-ból, frissítés után is megmarad).
+- Hibás számla: lista alatt státusz + üzenet; **Újra** → `POST /api/invoices/:id/process` (kinyerés / FX újrafuttatás).
 
 ## Ismert korlátok
 
@@ -86,6 +87,7 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 
 - Új, ismétlődő számlafajtánál: az LLM eredményből semi-automatikus rules-javaslat (label / dátum / parser), emberi jóváhagyással — a következő ugyanolyan layout már rules-szel megy, az OpenRouter költség csökken.
 - OCR / image PDF támogatás.
-- Finomabb progress / retry UI hibás számlákra.
+- Confidence / „review” státusz: LLM sikerült, de soft check gyenge → manuális megerősítés, ne azonnal `error`.
+- CSV / Excel export (partner mátrix, számlalista); diagram hónap-tartomány szűrő.
 
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.
