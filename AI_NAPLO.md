@@ -104,4 +104,18 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 09:00 – Phase 5: aggregáció és kimutatás UI
+
+### Prompt
+> Csináld meg a kimutatásokat és aggregációt (PLANNING Phase 5).
+
+### Agent válasz / döntés
+- `buildMonthlySeries` / `buildPartnerMatrix` / `buildReport` — csak `done` + `amount_huf`.
+- Havi X = due date `YYYY-MM`, üres hónap = 0; partner oszlopok adószám szerint.
+- `GET /api/report`; UI: SVG vonaldiagram → partner tábla → részletes számlalista.
+- Aggregáció unit tesztek zöldek; frontend/backend typecheck OK.
+
+
+---
+
 

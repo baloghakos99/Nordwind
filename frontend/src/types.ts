@@ -49,3 +49,28 @@ export interface UploadResponse {
 export interface InvoiceListResponse {
   invoices: Invoice[];
 }
+
+export interface MonthlyPoint {
+  month: string;
+  incoming: number;
+  outgoing: number;
+}
+
+export interface PartnerColumn {
+  key: string;
+  label: string;
+  tax_id: string | null;
+}
+
+export interface PartnerMatrix {
+  partners: PartnerColumn[];
+  incoming: number[];
+  outgoing: number[];
+}
+
+export interface ReportResponse {
+  ok: true;
+  months: MonthlyPoint[];
+  partners: PartnerMatrix;
+  invoices: Invoice[];
+}

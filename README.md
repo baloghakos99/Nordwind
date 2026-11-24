@@ -47,7 +47,7 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 - [x] Phase 2 – bulk PDF upload
 - [x] Phase 3 – extraction (rule-based + LLM fallback)
 - [x] Phase 4 – MNB FX
-- [ ] Phase 5 – report UI
+- [x] Phase 5 – report UI
 
 ### Adatkinyerés (Phase 3)
 
@@ -62,5 +62,10 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 - Cache: `exchange_rates` tábla — ugyanaz a nap/deviza nem megy újra a hálózatra.
 - HUF: rate 1; kerekítés számlánként egész forintra (0,5↑).
 - Lista: eredeti összeg + `amount_huf` + felhasznált árfolyam/dátum.
+
+### Kimutatás (Phase 5)
+
+- `GET /api/report` — havi sorozat (due date), partner mátrix (adószám), forintosított számlák.
+- UI sorrend: diagram → cégenkénti tábla → számlalista (SQLite-ból, frissítés után is megmarad).
 
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.

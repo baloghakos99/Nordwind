@@ -31,7 +31,11 @@ export type {
 export type {
   HealthResponse,
   InvoiceListResponse,
+  MonthlyPointDto,
+  PartnerColumnDto,
+  PartnerMatrixDto,
   ProcessResult,
+  ReportResponse,
   UploadResponse,
   UploadResultFail,
   UploadResultItem,

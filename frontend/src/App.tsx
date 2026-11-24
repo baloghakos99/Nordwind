@@ -1,20 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Invoice, InvoiceListResponse } from './types';
+import type { Invoice, InvoiceListResponse, PartnerMatrix, MonthlyPoint, ReportResponse } from './types';
 import UploadZone from './components/UploadZone';
+import CashFlowChart from './components/CashFlowChart';
+import PartnerTable from './components/PartnerTable';
 import InvoiceList from './components/InvoiceList';
+
+const emptyPartners: PartnerMatrix = { partners: [], incoming: [], outgoing: [] };
 
 export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [months, setMonths] = useState<MonthlyPoint[]>([]);
+  const [partners, setPartners] = useState<PartnerMatrix>(emptyPartners);
+  const [reportInvoices, setReportInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setListError(null);
     try {
-      const res = await fetch('/api/invoices');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as InvoiceListResponse;
-      setInvoices(data.invoices || []);
+      const [listRes, reportRes] = await Promise.all([
+        fetch('/api/invoices'),
+        fetch('/api/report'),
+      ]);
+      if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
+      if (!reportRes.ok) throw new Error(`Report HTTP ${reportRes.status}`);
+      const listData = (await listRes.json()) as InvoiceListResponse;
+      const reportData = (await reportRes.json()) as ReportResponse;
+      setInvoices(listData.invoices || []);
+      setMonths(reportData.months || []);
+      setPartners(reportData.partners || emptyPartners);
+      setReportInvoices(reportData.invoices || []);
     } catch (e) {
       setListError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -26,7 +41,6 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
-  // Poll while any invoice is still pending/processing (extraction queue)
   useEffect(() => {
     const busy = invoices.some((i) => i.status === 'pending' || i.status === 'processing');
     if (!busy) return undefined;
@@ -38,7 +52,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen px-6 py-16 md:px-12">
-      <main className="mx-auto max-w-3xl">
+      <main className="mx-auto max-w-5xl">
         <p className="text-sm tracking-[0.2em] uppercase text-[var(--nw-sky)]">
           Nordwind Solutions Kft.
         </p>
@@ -46,20 +60,27 @@ export default function App() {
           Számla cash-flow
         </h1>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-[var(--nw-ink)]/75">
-          Tölts fel PDF számlákat. A mezőket szabályalapú kinyerés tölti ki;
-          a forintos kimutatás a következő fázisokban jön.
+          PDF számlák feltöltése, mezőkinyerés, MNB árfolyam — forintos kimutatás
+          fizetési határidő és partner szerint.
         </p>
 
-        <UploadZone onUploaded={() => {
-          void refresh();
-        }}
+        <UploadZone
+          onUploaded={() => {
+            void refresh();
+          }}
         />
 
         {listError && (
-          <p className="mt-4 text-sm text-red-800">Lista hiba: {listError}</p>
+          <p className="mt-4 text-sm text-red-800">Adat hiba: {listError}</p>
         )}
 
-        <InvoiceList invoices={invoices} loading={loading} />
+        <CashFlowChart months={months} />
+        <PartnerTable matrix={partners} />
+        <InvoiceList
+          invoices={invoices}
+          reportInvoices={reportInvoices}
+          loading={loading}
+        />
       </main>
     </div>
   );

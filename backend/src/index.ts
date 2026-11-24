@@ -10,6 +10,7 @@ import db from './db.js';
 import { scheduleProcessPending } from './extraction/processInvoice.js';
 import './paths.js';
 import invoicesRouter from './routes/invoices.js';
+import reportRouter from './routes/report.js';
 import type { HealthResponse } from './types/api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/invoices', invoicesRouter);
+app.use('/api/report', reportRouter);
 
 const frontendDist = process.env.FRONTEND_DIST
   || path.join(__dirname, '../../frontend/dist');

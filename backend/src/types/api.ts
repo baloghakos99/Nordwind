@@ -53,3 +53,28 @@ export interface ProcessResult {
   error?: string;
   validation?: unknown;
 }
+
+export interface MonthlyPointDto {
+  month: string;
+  incoming: number;
+  outgoing: number;
+}
+
+export interface PartnerColumnDto {
+  key: string;
+  label: string;
+  tax_id: string | null;
+}
+
+export interface PartnerMatrixDto {
+  partners: PartnerColumnDto[];
+  incoming: number[];
+  outgoing: number[];
+}
+
+export interface ReportResponse {
+  ok: true;
+  months: MonthlyPointDto[];
+  partners: PartnerMatrixDto;
+  invoices: InvoiceRow[];
+}

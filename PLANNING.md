@@ -103,9 +103,11 @@ Számlaszám; kiállító/vevő név+adószám; kiállítás dátuma; **teljesí
 3. **Számlalista** – kinyert mezők + eredeti összeg/pénznem + MNB rate/dátum + HUF
 
 ### Acceptance
-- Aggregáció unit tesztek
-- UI frissítés után is a mentett adatokból épül
-- Docker demó: 100 számla → diagram + tábla + lista
+- [x] Aggregáció unit tesztek
+- [x] UI frissítés után is a mentett adatokból épül
+- [ ] Docker demó: 100 számla → diagram + tábla + lista
+
+**Állapot:** kész (2026-11-24) — `/api/report`, havi diagram, partner mátrix, részletes számlalista
 
 ---
 
