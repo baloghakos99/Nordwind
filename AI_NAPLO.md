@@ -17,15 +17,37 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 ### AI javaslat / döntés
 - **Elfogadva:** mindig érvényes rule-ok a projektre (kontextus, napló, titkok, git), plusz később fájlspecifikus rule-ok a kódra.
 - **Elfogadva:** `@napló` / `@naplo` jelölő a naplóba íráshoz – csak jelölt promptok kerülnek be, nem minden üzenet.
-- **Elfogadva:** rule fájlnevek angolul; az `AI_NAPLO.md` a FELADAT 7. pontja szerinti kötelező leadandó név marad.
+- **Elfogadva:** rule fájlnevek angolul; az `AI_NAPLO.md` a FELADAT szerinti kötelező név.
 
-### Szabályfájlok (ebben a lépésben)
-| Fájl | Cél |
-|---|---|
-| `.cursor/rules/ai-journal.mdc` | Jelölt promptok appendelése az `AI_NAPLO.md`-be |
-| `.cursor/rules/project-context.mdc` | FELADAT lényeg: cégadatok, követelmények, korlátok |
-| `.cursor/rules/secrets-and-env.mdc` | API kulcs ne kerüljön a repóba |
-| `.cursor/rules/git-workflow.mdc` | Kis, beszédes commitok; ne commitoljon kérés nélkül |
 
-### Következő
-Architektúra / tech stack döntés, majd scaffolding (Docker + webapp váz).
+## 2026-11-24 06:30 – PLANNING.md: feladat részegységekre bontása
+
+### Prompt
+> Hozz létre egy `PLANNING.md` file-t; bontsd részegységekre a feladatot: (1) architektúra/skeleton Node.js + SQLite + Vite React + Tailwind, (2) tömeges PDF feltöltés, (3) extrakció, (4) MNB currency modul, (5) aggregáció/kimutatás.
+
+### Agent válasz / döntés
+- **Elfogadva** a felhasználó stackje: Node.js + SQLite + Vite/React/Tailwind.
+- `PLANNING.md` öt fázissal, deliverables + acceptance kritériumokkal, commit ritmussal.
+- LLM vs szabályalapú extrakció: Phase 3-ban döntendő, nem előre rögzítve.
+
+---
+
+## 2026-11-24 06:34 – Phase 1 skeleton (PLANNING 9–25)
+
+### Prompt
+> Készítsd el a Phase 1 vázat (architektúra, skeleton: Node.js + SQLite + Vite React + Tailwind); naplózd.
+
+### Agent válasz / döntés
+- **Elfogadva:** egy konténeres deploy – Express szolgálja az API-t és a built SPA-t (`:8080`).
+- **Elfogadva:** `better-sqlite3` + volume `/data`; séma váz: `invoices`, `exchange_rates`, `upload_errors`.
+- **Elfogadva:** Tailwind v4 (`@tailwindcss/vite`); placeholder UI health checkkel.
+- Docker `compose up --build` sikeres; `/api/health` → `ok`, UI HTTP 200.
+- Direction a DB-ben angolul (`incoming`/`outgoing`) – UI később magyar címkékkel.
+
+### Érintett fájlok
+- `backend/` – Express, `db.js`, `schema.sql`
+- `frontend/` – Vite React Tailwind App
+- `Dockerfile`, `docker-compose.yml`, `.env.example`, `.gitignore`
+- `README.md` – indítás + architektúra váz
+- `PLANNING.md` – Phase 1 acceptance pipálva
+

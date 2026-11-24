@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --nw-ink: #0f2744;
+  --nw-sky: #1a6b9a;
+  --nw-mist: #e8f1f6;
+  --nw-sand: #f7f3ec;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--nw-ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% 0%, #d4e8f2 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, #e8ddd0 0%, transparent 50%),
+    linear-gradient(180deg, var(--nw-sand) 0%, var(--nw-mist) 100%);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}

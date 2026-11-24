@@ -1,0 +1,19 @@
+{
+  "name": "nordwind",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w nordwind-backend\" \"npm run dev -w nordwind-frontend\"",
+    "dev:backend": "npm run dev -w nordwind-backend",
+    "dev:frontend": "npm run dev -w nordwind-frontend",
+    "build": "npm run build -w nordwind-frontend",
+    "start": "npm run start -w nordwind-backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
