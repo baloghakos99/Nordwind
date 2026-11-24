@@ -4,7 +4,12 @@ import type {
   Parties,
   TaxIdHit,
 } from '../types/invoice.js';
-import { findAmountNear, detectCurrency, parseAmount } from './parseAmount.js';
+import {
+  findAmountNear,
+  findLastPositiveAmount,
+  detectCurrency,
+  parseAmount,
+} from './parseAmount.js';
 import { findDateAfter, parseDate } from './parseDate.js';
 import { isNordwindName, isNordwindTaxId, normalizeTaxId } from './nordwind.js';
 import { isGenericPartyName } from './validate.js';
@@ -83,9 +88,32 @@ function extractInvoiceNumber(text: string): string | null {
     }
   }
   const invLine = text.match(
-    /\b(NWS[\/\-]\d{4}[\/\-]\d+|FAC-\d{4}-\d+|F\d{4}-\d+|INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+|KT-\d{4}\/\d+)\b/i,
+    /\b(NWS[\/\-]\d{4}[\/\-]\d+|FAC-\d{4}-\d+|F\d{4}-\d+|INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+|KT-\d{4}\/\d+|\d{4}-\d{3,5})\b/i,
   );
   return invLine ? invLine[1] : null;
+}
+
+/** When buyer label missing: split near Nordwind / second tax id instead of blind 35%. */
+function inferBuyerStart(text: string, labeledIndex: number | undefined): number {
+  if (labeledIndex != null) return labeledIndex;
+  const taxes = collectTaxIds(text);
+  if (taxes.length >= 2) {
+    const first = taxes[0];
+    const nw = taxes.find((t) => isNordwindTaxId(t.raw));
+    if (nw && isNordwindTaxId(first.raw)) {
+      // Outgoing: buyer block must start after our tax (else Nordwind lands in buyerTaxes)
+      const partner = taxes.find((t) => !isNordwindTaxId(t.raw));
+      if (partner) {
+        return Math.max(nw.index + String(nw.raw).length, partner.index - 100);
+      }
+    }
+    if (nw && !isNordwindTaxId(first.raw)) {
+      // Incoming: Nordwind in buyer area — keep a little company-name context
+      return Math.max(0, Math.min(nw.index - 100, taxes[0].index + String(taxes[0].raw).length));
+    }
+    return Math.max(0, taxes[1].index - 100);
+  }
+  return Math.floor(text.length * 0.35);
 }
 
 function extractCurrency(text: string): string | null {
@@ -157,7 +185,7 @@ function companyNameNear(text: string, index: number, direction: 'before' = 'bef
 
 function splitParties(text: string): Parties {
   const buyerMatch = text.match(BUYER_SECTION);
-  const buyerStart = buyerMatch?.index != null ? buyerMatch.index : Math.floor(text.length * 0.35);
+  const buyerStart = inferBuyerStart(text, buyerMatch?.index);
   const header = text.slice(0, buyerStart);
   const buyerBlock = text.slice(buyerStart, buyerStart + 500);
 
@@ -290,11 +318,12 @@ export function extractInvoiceFromText(text: string): ExtractedInvoiceFields {
   let currency: string | null = extractCurrency(normalized) || gross?.currency || null;
   let grossAmount: number | null = gross?.amount ?? null;
 
-  // Fallback: last "Total due" / money-looking near end
-  if (grossAmount == null) {
-    const tail = normalized.slice(-400);
-    const m = tail.match(/(?:total\s*due|rechnungsbetrag|fizetend[oő])[^\d€$]*([\d.\s,]+\d)/i);
-    if (m) grossAmount = parseAmount(m[1]);
+  if (grossAmount == null || grossAmount <= 0) {
+    const tailHit = findLastPositiveAmount(normalized, 500);
+    if (tailHit && tailHit.amount > 0) {
+      grossAmount = tailHit.amount;
+      currency = currency || tailHit.currency;
+    }
   }
 
   const parties = splitParties(normalized);

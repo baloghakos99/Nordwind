@@ -15,6 +15,8 @@ const MONTHS: Record<string, number> = {
   janvier: 1, fevrier: 2, 'février': 2, mars: 3, avril: 4, juin: 6,
   juillet: 7, aout: 8, 'août': 8, septembre: 9, octobre: 10,
   novembre: 11, decembre: 12, 'décembre': 12,
+  // NL (juni/juli/oktober/september… share DE/EN/HU keys)
+  januari: 1, februari: 2, maart: 3, mei: 5, augustus: 8,
   // ES
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
   julio: 7, agosto: 8, septiembre: 9, setiembre: 9, noviembre: 11, diciembre: 12,

@@ -181,4 +181,17 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 11:04 – Rules hardening (minták nélkül)
+
+### Prompt
+> Érdemes minták nélkül robosztusabbá tenni a szabályokat — csináld (összeg/számlaszám fallback, buyer-split, általános védelem).
+
+### Agent válasz / döntés
+- `findAmountNear`: hátulról, **0 összeg skip** (TVA zaj); `findLastPositiveAmount` tail fallback.
+- Buyer label nélkül: split Nordwind / 2. adószám körül (ne vak 35%).
+- Számlaszám fallback: `YYYY-NNNN` (pl. `2026-0588`); NL hónapnevek.
+- Teszt: VAT-0 skip + FR outgoing label nélkül.
+
+---
+
 

@@ -54,6 +54,46 @@ describe('findAmountNear US total', () => {
     assert.equal(hit.amount, 2597.86);
     assert.equal(hit.currency, 'USD');
   });
+
+  it('skips zero VAT total and keeps positive payable', async () => {
+    const { findAmountNear } = await import('./parseAmount.js');
+    const text = [
+      'Net à payer TTC 11 353,00 €',
+      'Total TVA (0 %) 0,00 €',
+      'Net à payer TTC 11 353,00 €',
+    ].join('\n');
+    // Broader labels where last match would be TVA 0 without positive-skip
+    const broad = /(?:net\s*[àa]\s*payer(?:\s*ttc)?|total\s*tva|total\s*ttc)\s*[:.]?\s*/i;
+    const hit = findAmountNear(text, broad);
+    assert.ok(hit);
+    assert.equal(hit.amount, 11353);
+  });
+});
+
+describe('hardening without buyer label', () => {
+  it('still resolves FR outgoing via tax-id split', () => {
+    const text = `FACTURE
+N° de facture: NWS/2026/0099
+NORDWIND SOLUTIONS KFT.
+N° TVA intracom. HU26481937
+LUMIÈRE CONSEIL SARL
+N° TVA intracom.: FR47829461375
+Date de facture
+11/09/2026
+Date de prestation
+05/09/2026
+Date d'échéance
+26/09/2026
+Devise EUR
+Net à payer TTC
+11 353,00 €`;
+    const f = extractInvoiceFromText(text);
+    assert.equal(f.invoice_number, 'NWS/2026/0099');
+    assert.equal(f.direction, 'outgoing');
+    assert.equal(f.gross_amount, 11353);
+    assert.match(String(f.partner_name), /Lumi[eè]re|CONSEIL/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
 });
 
 const HU = `SZÁMLA
