@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import type { MonthlyPoint } from '../types';
 
 interface CashFlowChartProps {
   months: MonthlyPoint[];
 }
+
+type HoverTip = {
+  month: string;
+  kind: 'incoming' | 'outgoing';
+  amount: number;
+  x: number;
+  y: number;
+};
 
 function formatAxis(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
@@ -10,7 +19,13 @@ function formatAxis(n: number): string {
   return String(Math.round(n));
 }
 
+function formatHuf(n: number): string {
+  return `${new Intl.NumberFormat('hu-HU', { maximumFractionDigits: 0 }).format(n)} Ft`;
+}
+
 export default function CashFlowChart({ months }: CashFlowChartProps) {
+  const [tip, setTip] = useState<HoverTip | null>(null);
+
   if (months.length === 0) {
     return (
       <section className="mt-12">
@@ -55,11 +70,11 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
         Bruttó összegek forintban, due date hónapokra bontva.
       </p>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="relative mt-4 max-w-4xl">
+        <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${w} ${h}`}
-          className="min-w-[36rem] w-full max-w-4xl"
-          role="img"
+          className="min-w-[36rem] w-full"
           aria-label="Havi bejövő és kimenő HUF vonaldiagram"
         >
           {yTicks.map((t) => (
@@ -84,26 +99,96 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
             </g>
           ))}
 
-          <path d={linePath('incoming')} fill="none" stroke="#1a6b9a" strokeWidth="2.5" />
-          <path d={linePath('outgoing')} fill="none" stroke="#b45309" strokeWidth="2.5" />
+          <path
+            d={linePath('incoming')}
+            fill="none"
+            stroke="#1a6b9a"
+            strokeWidth="2.5"
+            pointerEvents="none"
+          />
+          <path
+            d={linePath('outgoing')}
+            fill="none"
+            stroke="#b45309"
+            strokeWidth="2.5"
+            pointerEvents="none"
+          />
 
-          {months.map((m, i) => (
-            <g key={m.month}>
-              <circle cx={xAt(i)} cy={yAt(m.incoming)} r="3.5" fill="#1a6b9a" />
-              <circle cx={xAt(i)} cy={yAt(m.outgoing)} r="3.5" fill="#b45309" />
-              <text
-                x={xAt(i)}
-                y={h - 12}
-                textAnchor="middle"
-                fontSize="11"
-                className="fill-[var(--nw-ink)]"
-              >
-                {m.month}
-              </text>
-            </g>
-          ))}
+          {months.map((m, i) => {
+            const xi = xAt(i);
+            const yin = yAt(m.incoming);
+            const yout = yAt(m.outgoing);
+            return (
+              <g key={m.month}>
+                <circle
+                  cx={xi}
+                  cy={yin}
+                  r="12"
+                  fill="#1a6b9a"
+                  fillOpacity={0.01}
+                  className="cursor-pointer"
+                  style={{ pointerEvents: 'all' }}
+                  onMouseEnter={() =>
+                    setTip({
+                      month: m.month,
+                      kind: 'incoming',
+                      amount: m.incoming,
+                      x: xi,
+                      y: yin,
+                    })
+                  }
+                  onMouseLeave={() => setTip(null)}
+                />
+                <circle
+                  cx={xi}
+                  cy={yin}
+                  r={tip?.month === m.month && tip.kind === 'incoming' ? 5 : 3.5}
+                  fill="#1a6b9a"
+                  pointerEvents="none"
+                />
 
-          <g transform={`translate(${pad.left}, 8)`}>
+                <circle
+                  cx={xi}
+                  cy={yout}
+                  r="12"
+                  fill="#b45309"
+                  fillOpacity={0.01}
+                  className="cursor-pointer"
+                  style={{ pointerEvents: 'all' }}
+                  onMouseEnter={() =>
+                    setTip({
+                      month: m.month,
+                      kind: 'outgoing',
+                      amount: m.outgoing,
+                      x: xi,
+                      y: yout,
+                    })
+                  }
+                  onMouseLeave={() => setTip(null)}
+                />
+                <circle
+                  cx={xi}
+                  cy={yout}
+                  r={tip?.month === m.month && tip.kind === 'outgoing' ? 5 : 3.5}
+                  fill="#b45309"
+                  pointerEvents="none"
+                />
+
+                <text
+                  x={xi}
+                  y={h - 12}
+                  textAnchor="middle"
+                  fontSize="11"
+                  className="fill-[var(--nw-ink)]"
+                  pointerEvents="none"
+                >
+                  {m.month}
+                </text>
+              </g>
+            );
+          })}
+
+          <g transform={`translate(${pad.left}, 8)`} pointerEvents="none">
             <rect x="0" y="0" width="10" height="3" fill="#1a6b9a" />
             <text x="16" y="4" fontSize="12" className="fill-[var(--nw-ink)]">
               Bejövő
@@ -114,6 +199,28 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
             </text>
           </g>
         </svg>
+        </div>
+
+        {tip && (() => {
+          const placeBelow = tip.y < pad.top + 48;
+          return (
+            <div
+              className="pointer-events-none absolute z-20 rounded-sm bg-[var(--nw-ink)] px-2.5 py-1.5 text-xs text-white shadow-md"
+              style={{
+                left: `min(calc(${(tip.x / w) * 100}% + 8px), calc(100% - 11rem))`,
+                top: placeBelow
+                  ? `calc(${(tip.y / h) * 100}% + 10px)`
+                  : `calc(${(tip.y / h) * 100}% - 8px)`,
+                transform: placeBelow ? undefined : 'translateY(-100%)',
+              }}
+            >
+              <div className="font-medium tabular-nums">{formatHuf(tip.amount)}</div>
+              <div className="opacity-80">
+                {tip.month} · {tip.kind === 'incoming' ? 'bejövő' : 'kimenő'}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </section>
   );

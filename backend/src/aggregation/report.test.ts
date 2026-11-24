@@ -117,6 +117,8 @@ describe('buildPartnerMatrix', () => {
     const alpha = matrix.partners.findIndex((p) => p.tax_id === '11111111-1-11');
     const beta = matrix.partners.findIndex((p) => p.tax_id === 'DE123');
     assert.ok(alpha >= 0 && beta >= 0);
+    assert.equal(matrix.partners[alpha].label, 'ALPHA KFT.');
+    assert.equal(matrix.partners[beta].label, 'BETA GMBH');
     assert.equal(matrix.incoming[alpha], 200);
     assert.equal(matrix.outgoing[alpha], 80);
     assert.equal(matrix.incoming[beta], 10);

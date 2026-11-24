@@ -107,16 +107,17 @@ export function buildPartnerMatrix(invoices: InvoiceRow[]): PartnerMatrix {
     if (!inv.direction) continue;
     const key = partnerKey(inv);
     let agg = byKey.get(key);
+    const displayName = (inv.partner_name || inv.partner_tax_id || `Partner #${inv.id}`).toLocaleUpperCase('hu-HU');
     if (!agg) {
       agg = {
-        label: inv.partner_name || inv.partner_tax_id || `Partner #${inv.id}`,
+        label: displayName,
         tax_id: inv.partner_tax_id,
         incoming: 0,
         outgoing: 0,
       };
       byKey.set(key, agg);
-    } else if (inv.partner_name && agg.label.length < inv.partner_name.length) {
-      agg.label = inv.partner_name;
+    } else if (inv.partner_name && agg.label.length < displayName.length) {
+      agg.label = displayName;
     }
     const amt = Number(inv.amount_huf) || 0;
     if (inv.direction === 'incoming') agg.incoming += amt;
@@ -127,7 +128,7 @@ export function buildPartnerMatrix(invoices: InvoiceRow[]): PartnerMatrix {
     .sort((a, b) => a[1].label.localeCompare(b[1].label, 'hu'))
     .map(([key, v]) => ({
       key,
-      label: v.label,
+      label: v.label.toLocaleUpperCase('hu-HU'),
       tax_id: v.tax_id,
     }));
 

@@ -1,4 +1,5 @@
 import type { PartnerMatrix } from '../types';
+import { splitNameTwoLines } from '../lib/splitNameTwoLines';
 
 interface PartnerTableProps {
   matrix: PartnerMatrix;
@@ -29,23 +30,27 @@ export default function PartnerTable({ matrix }: PartnerTableProps) {
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--nw-ink)]/20 text-left">
-                <th className="sticky left-0 bg-[var(--nw-sand)] py-2 pr-4 font-medium">
+                <th className="sticky left-0 z-10 bg-[var(--nw-mist)] py-2 pr-4 font-medium">
                   Irány
                 </th>
                 {partners.map((p) => (
                   <th
                     key={p.key}
-                    className="px-3 py-2 font-medium whitespace-nowrap"
+                    className="px-3 py-2 align-bottom font-medium uppercase leading-snug"
                     title={p.tax_id || undefined}
                   >
-                    {p.label}
+                    {splitNameTwoLines(p.label).map((line, i) => (
+                      <div key={i} className="whitespace-nowrap">
+                        {line}
+                      </div>
+                    ))}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-[var(--nw-ink)]/10">
-                <th className="sticky left-0 bg-[var(--nw-mist)]/80 py-2 pr-4 text-left font-semibold">
+                <th className="sticky left-0 z-10 bg-[var(--nw-mist)] py-2 pr-4 text-left font-semibold">
                   Össz bejövő
                 </th>
                 {incoming.map((v, i) => (
@@ -55,7 +60,7 @@ export default function PartnerTable({ matrix }: PartnerTableProps) {
                 ))}
               </tr>
               <tr>
-                <th className="sticky left-0 bg-[var(--nw-mist)]/80 py-2 pr-4 text-left font-semibold">
+                <th className="sticky left-0 z-10 bg-[var(--nw-mist)] py-2 pr-4 text-left font-semibold">
                   Össz kimenő
                 </th>
                 {outgoing.map((v, i) => (

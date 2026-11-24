@@ -1,4 +1,5 @@
 import type { ExtractionMethod, Invoice, InvoiceDirection, InvoiceStatus } from '../types';
+import { splitNameTwoLines } from '../lib/splitNameTwoLines';
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   pending: 'várakozik',
@@ -79,9 +80,17 @@ export default function InvoiceList({ invoices, reportInvoices, loading }: Invoi
                       {inv.source_filename}
                     </div>
                   </td>
-                  <td className="px-2 py-2 whitespace-nowrap">
-                    <div>{inv.partner_name || '—'}</div>
-                    <div className="font-mono text-xs text-[var(--nw-ink)]/45">
+                  <td className="px-2 py-2">
+                    <div className="uppercase leading-snug">
+                      {inv.partner_name
+                        ? splitNameTwoLines(inv.partner_name).map((line, i) => (
+                            <div key={i} className="whitespace-nowrap">
+                              {line}
+                            </div>
+                          ))
+                        : '—'}
+                    </div>
+                    <div className="font-mono text-xs text-[var(--nw-ink)]/45 whitespace-nowrap">
                       {inv.partner_tax_id || ''}
                     </div>
                   </td>
@@ -98,9 +107,16 @@ export default function InvoiceList({ invoices, reportInvoices, loading }: Invoi
                     {formatMoney(inv.gross_amount, inv.currency)}
                   </td>
                   <td className="px-2 py-2 text-right font-mono text-xs whitespace-nowrap">
-                    {inv.currency === 'HUF'
-                      ? '1'
-                      : `${inv.mnb_rate ?? '—'} (${inv.mnb_rate_date || '—'})`}
+                    {inv.currency === 'HUF' ? (
+                      <div>1</div>
+                    ) : (
+                      <>
+                        <div>{inv.mnb_rate ?? '—'}</div>
+                        <div className="text-[var(--nw-ink)]/45">
+                          {inv.mnb_rate_date || '—'}
+                        </div>
+                      </>
+                    )}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap">
                     {formatMoney(inv.amount_huf, 'HUF', 0)}
