@@ -44,7 +44,7 @@ Együtt fut a backend (`node --watch`) és a frontend (Vite) a gyökér `concurr
 ## Állapot
 
 - [x] Phase 1 – skeleton
-- [ ] Phase 2 – bulk PDF upload
+- [x] Phase 2 – bulk PDF upload
 - [ ] Phase 3 – extraction
 - [ ] Phase 4 – MNB FX
 - [ ] Phase 5 – report UI

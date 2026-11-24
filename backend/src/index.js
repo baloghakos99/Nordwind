@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import db from './db.js';
+import './paths.js';
+import invoicesRouter from './routes/invoices.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,6 +22,8 @@ app.get('/api/health', (_req, res) => {
     invoices: invoiceCount,
   });
 });
+
+app.use('/api/invoices', invoicesRouter);
 
 const frontendDist = process.env.FRONTEND_DIST
   || path.join(__dirname, '../../frontend/dist');

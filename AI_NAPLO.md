@@ -44,10 +44,18 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 - Docker `compose up --build` sikeres; `/api/health` → `ok`, UI HTTP 200.
 - Direction a DB-ben angolul (`incoming`/`outgoing`) – UI később magyar címkékkel.
 
-### Érintett fájlok
-- `backend/` – Express, `db.js`, `schema.sql`
-- `frontend/` – Vite React Tailwind App
-- `Dockerfile`, `docker-compose.yml`, `.env.example`, `.gitignore`
-- `README.md` – indítás + architektúra váz
-- `PLANNING.md` – Phase 1 acceptance pipálva
+
+
+## 2026-11-24 06:46 – Phase 2: tömeges PDF feltöltés (PLANNING 31–45)
+
+### Prompt
+> Csináld meg a PDF feltöltést (Phase 2)
+
+### Agent válasz / döntés
+- **Elfogadva:** PDF → `data/uploads/{sha256}.pdf`; DB sor `pending` státusszal.
+- **Elfogadva:** hash-alapú duplikátum skip (kiállító+számlaszám Phase 3 után).
+- **Elfogadva:** hibás / nem-PDF fájl csak az adott eredményben fail; a többi megy tovább (multer fileFilter helyett per-fájl validáció + `%PDF-` magic).
+- API: `POST /api/invoices/upload`, `GET /api/invoices`.
+- UI: drag & drop + file picker, státuszlista.
+- Smoke test: 2 új + 1 hibás + 1 duplikátum → várt summary.
 

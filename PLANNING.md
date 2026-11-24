@@ -41,8 +41,10 @@ Fázisok sorrendben; minden fázis után legyen működő, commitolható állapo
 - Frissítés után is megmarad az állapot (SQLite)
 
 ### Acceptance
-- 100 PDF egy feltöltéssel elfogadva
-- Egy hibás fájl → hibaüzenet az adott sornál, a többi megy tovább
+- [x] 100 PDF egy feltöltéssel elfogadva
+- [x] Egy hibás fájl → hibaüzenet az adott sornál, a többi megy tovább
+
+**Állapot:** kész (2026-11-24) — PDF → `data/uploads/{hash}.pdf`, hash-duplikátum skip, lista SQLite-ból
 
 ---
 

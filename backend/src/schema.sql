@@ -1,4 +1,4 @@
--- Phase 1 skeleton; columns refined in later phases.
+-- Refined in later phases; Phase 2 adds stored_path + file_hash uniqueness.
 
 CREATE TABLE IF NOT EXISTS invoices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,14 +19,23 @@ CREATE TABLE IF NOT EXISTS invoices (
   mnb_rate_date TEXT,
   amount_huf INTEGER,
   source_filename TEXT,
+  stored_path TEXT,
   file_hash TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'done', 'error')),
   error_message TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE (issuer_tax_id, invoice_number)
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_file_hash_uq
+  ON invoices (file_hash)
+  WHERE file_hash IS NOT NULL;
+
+-- Business dedupe (issuer + number) after extraction; NULLs allowed until then.
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_issuer_number_uq
+  ON invoices (issuer_tax_id, invoice_number)
+  WHERE issuer_tax_id IS NOT NULL AND invoice_number IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
   currency TEXT NOT NULL,

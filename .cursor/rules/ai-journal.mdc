@@ -26,8 +26,6 @@ Ha a felhasználó üzenetében szerepel a **`@napló`** vagy **`@naplo`** jelö
 - Mit fogadtál el vagy vetettél el (ha releváns), és miért.
 - Ha hibát találtál vagy javítottál: hogyan vetted észre.
 
-### Érintett fájlok
-- `út/fájl` – röviden mi változott (ha volt változás)
 ```
 
 ## Mikor NE naplózz
@@ -36,6 +34,3 @@ Ha a felhasználó üzenetében szerepel a **`@napló`** vagy **`@naplo`** jelö
 - Tisztán technikai „folytasd” / „ok” üzenetek jelölő nélkül.
 - Ne naplózz titkokat (API kulcs, `.env` értékek) – helyettesítsd `[REDACTED]`-del.
 
-## Megjegyzés
-
-A napló a FELADAT 7. pontjának része: a meghatározó lépések és promptok legyenek visszakereshetők.
