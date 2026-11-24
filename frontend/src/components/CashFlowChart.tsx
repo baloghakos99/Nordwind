@@ -39,11 +39,13 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
     );
   }
 
-  const w = 720;
-  const h = 280;
-  const pad = { top: 24, right: 16, bottom: 40, left: 56 };
+  const dense = months.length > 8;
+  const w = 800;
+  const h = dense ? 340 : 280;
+  const pad = { top: 28, right: 48, bottom: dense ? 96 : 44, left: 56 };
   const innerW = w - pad.left - pad.right;
   const innerH = h - pad.top - pad.bottom;
+  const labelY = pad.top + innerH + (dense ? 10 : 18);
 
   const maxY = Math.max(
     1,
@@ -62,7 +64,7 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
   const yTicks = Array.from({ length: ticks + 1 }, (_, i) => (maxY * i) / ticks);
 
   return (
-    <section className="mt-12">
+    <section className="mt-8">
       <h2 className="text-sm font-medium uppercase tracking-wide text-[var(--nw-ink)]/60">
         Fizetési határidő szerint (havi)
       </h2>
@@ -70,11 +72,10 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
         Bruttó összegek forintban, due date hónapokra bontva.
       </p>
 
-      <div className="relative mt-4 max-w-4xl">
-        <div className="overflow-x-auto">
+      <div className="relative mx-auto mt-4 w-full max-w-4xl">
         <svg
           viewBox={`0 0 ${w} ${h}`}
-          className="min-w-[36rem] w-full"
+          className="mx-auto block h-auto w-full"
           aria-label="Havi bejövő és kimenő HUF vonaldiagram"
         >
           {yTicks.map((t) => (
@@ -102,14 +103,14 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
           <path
             d={linePath('incoming')}
             fill="none"
-            stroke="#1a6b9a"
+            stroke="#b45309"
             strokeWidth="2.5"
             pointerEvents="none"
           />
           <path
             d={linePath('outgoing')}
             fill="none"
-            stroke="#b45309"
+            stroke="#1a6b9a"
             strokeWidth="2.5"
             pointerEvents="none"
           />
@@ -124,7 +125,7 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
                   cx={xi}
                   cy={yin}
                   r="12"
-                  fill="#1a6b9a"
+                  fill="#b45309"
                   fillOpacity={0.01}
                   className="cursor-pointer"
                   style={{ pointerEvents: 'all' }}
@@ -143,7 +144,7 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
                   cx={xi}
                   cy={yin}
                   r={tip?.month === m.month && tip.kind === 'incoming' ? 5 : 3.5}
-                  fill="#1a6b9a"
+                  fill="#b45309"
                   pointerEvents="none"
                 />
 
@@ -151,7 +152,7 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
                   cx={xi}
                   cy={yout}
                   r="12"
-                  fill="#b45309"
+                  fill="#1a6b9a"
                   fillOpacity={0.01}
                   className="cursor-pointer"
                   style={{ pointerEvents: 'all' }}
@@ -170,36 +171,36 @@ export default function CashFlowChart({ months }: CashFlowChartProps) {
                   cx={xi}
                   cy={yout}
                   r={tip?.month === m.month && tip.kind === 'outgoing' ? 5 : 3.5}
-                  fill="#b45309"
+                  fill="#1a6b9a"
                   pointerEvents="none"
                 />
 
                 <text
                   x={xi}
-                  y={h - 12}
-                  textAnchor="middle"
-                  fontSize="11"
+                  y={labelY}
+                  textAnchor={dense ? 'end' : 'middle'}
+                  fontSize={dense ? 10 : 11}
                   className="fill-[var(--nw-ink)]"
                   pointerEvents="none"
+                  transform={dense ? `rotate(-40 ${xi} ${labelY})` : undefined}
                 >
-                  {m.month}
+                  {dense ? m.month.slice(2) : m.month}
                 </text>
               </g>
             );
           })}
 
           <g transform={`translate(${pad.left}, 8)`} pointerEvents="none">
-            <rect x="0" y="0" width="10" height="3" fill="#1a6b9a" />
+            <rect x="0" y="0" width="10" height="3" fill="#b45309" />
             <text x="16" y="4" fontSize="12" className="fill-[var(--nw-ink)]">
               Bejövő
             </text>
-            <rect x="90" y="0" width="10" height="3" fill="#b45309" />
+            <rect x="90" y="0" width="10" height="3" fill="#1a6b9a" />
             <text x="106" y="4" fontSize="12" className="fill-[var(--nw-ink)]">
               Kimenő
             </text>
           </g>
         </svg>
-        </div>
 
         {tip && (() => {
           const placeBelow = tip.y < pad.top + 48;

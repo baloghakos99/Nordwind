@@ -6,13 +6,14 @@ interface PartnerTableProps {
 }
 
 function formatHuf(n: number): string {
-  return new Intl.NumberFormat('hu-HU', {
+  return `${new Intl.NumberFormat('hu-HU', {
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(n)} HUF`;
 }
 
 export default function PartnerTable({ matrix }: PartnerTableProps) {
   const { partners, incoming, outgoing } = matrix;
+  const single = partners.length === 1;
 
   return (
     <section className="mt-12">
@@ -25,9 +26,29 @@ export default function PartnerTable({ matrix }: PartnerTableProps) {
 
       {partners.length === 0 ? (
         <p className="mt-4 text-[var(--nw-ink)]/55">Nincs partner adat.</p>
+      ) : single ? (
+        <div className="mt-4 max-w-md">
+          <p
+            className="whitespace-nowrap font-medium uppercase"
+            title={partners[0].tax_id || undefined}
+          >
+            {partners[0].label}
+          </p>
+          {partners[0].tax_id && (
+            <p className="mt-0.5 font-mono text-xs text-[var(--nw-ink)]/50">
+              {partners[0].tax_id}
+            </p>
+          )}
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-8 gap-y-2 text-sm">
+            <dt className="font-semibold">Össz bejövő</dt>
+            <dd className="text-right tabular-nums">{formatHuf(incoming[0])}</dd>
+            <dt className="font-semibold">Össz kimenő</dt>
+            <dd className="text-right tabular-nums">{formatHuf(outgoing[0])}</dd>
+          </dl>
+        </div>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
+          <table className="w-max min-w-0 border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--nw-ink)]/20 text-left">
                 <th className="sticky left-0 z-10 bg-[var(--nw-mist)] py-2 pr-4 font-medium">

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Invoice,
   InvoiceListResponse,
   InvoiceStats,
+  PartnerColumn,
   PartnerMatrix,
   MonthlyPoint,
   ReportResponse,
@@ -10,9 +11,15 @@ import type {
 } from './types';
 import UploadZone from './components/UploadZone';
 import ProcessingProgress from './components/ProcessingProgress';
+import PartnerSearch from './components/PartnerSearch';
 import CashFlowChart from './components/CashFlowChart';
 import PartnerTable from './components/PartnerTable';
 import InvoiceList from './components/InvoiceList';
+import {
+  buildMonthlyFromInvoices,
+  filterPartnerMatrix,
+  invoicePartnerKey,
+} from './lib/partnerFilter';
 
 const emptyPartners: PartnerMatrix = { partners: [], incoming: [], outgoing: [] };
 
@@ -43,9 +50,10 @@ function statsFromInvoices(rows: Invoice[]): InvoiceStats {
 export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
-  const [months, setMonths] = useState<MonthlyPoint[]>([]);
-  const [partners, setPartners] = useState<PartnerMatrix>(emptyPartners);
-  const [reportInvoices, setReportInvoices] = useState<Invoice[]>([]);
+  const [allMonths, setAllMonths] = useState<MonthlyPoint[]>([]);
+  const [allPartners, setAllPartners] = useState<PartnerMatrix>(emptyPartners);
+  const [allReportInvoices, setAllReportInvoices] = useState<Invoice[]>([]);
+  const [selectedPartner, setSelectedPartner] = useState<PartnerColumn | null>(null);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -76,9 +84,9 @@ export default function App() {
       const reportRes = await fetch('/api/report');
       if (!reportRes.ok) throw new Error(`Report HTTP ${reportRes.status}`);
       const reportData = (await reportRes.json()) as ReportResponse;
-      setMonths(reportData.months || []);
-      setPartners(reportData.partners || emptyPartners);
-      setReportInvoices(reportData.invoices || []);
+      setAllMonths(reportData.months || []);
+      setAllPartners(reportData.partners || emptyPartners);
+      setAllReportInvoices(reportData.invoices || []);
     } catch (e) {
       setListError(e instanceof Error ? e.message : String(e));
     }
@@ -92,9 +100,32 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
+  // Drop selection if partner disappeared after refresh
+  useEffect(() => {
+    if (!selectedPartner) return;
+    const still = allPartners.partners.some((p) => p.key === selectedPartner.key);
+    if (!still) setSelectedPartner(null);
+  }, [allPartners, selectedPartner]);
+
+  const filteredReportInvoices = useMemo(() => {
+    if (!selectedPartner) return allReportInvoices;
+    return allReportInvoices.filter(
+      (inv) => invoicePartnerKey(inv) === selectedPartner.key,
+    );
+  }, [allReportInvoices, selectedPartner]);
+
+  const months = useMemo(() => {
+    if (!selectedPartner) return allMonths;
+    return buildMonthlyFromInvoices(filteredReportInvoices);
+  }, [selectedPartner, allMonths, filteredReportInvoices]);
+
+  const partners = useMemo(() => {
+    if (!selectedPartner) return allPartners;
+    return filterPartnerMatrix(allPartners, selectedPartner.key);
+  }, [selectedPartner, allPartners]);
+
   const busy = uploading || (stats != null && stats.busy > 0);
 
-  // While pipeline busy: poll list often; when it settles, refresh report once
   useEffect(() => {
     if (!busy) {
       if (wasBusyRef.current) {
@@ -148,11 +179,17 @@ export default function App() {
           <p className="mt-4 text-sm text-red-800">Adat hiba: {listError}</p>
         )}
 
+        <PartnerSearch
+          partners={allPartners.partners}
+          selected={selectedPartner}
+          onSelect={setSelectedPartner}
+        />
+
         <CashFlowChart months={months} />
         <PartnerTable matrix={partners} />
         <InvoiceList
           invoices={invoices}
-          reportInvoices={reportInvoices}
+          reportInvoices={filteredReportInvoices}
           loading={loading}
         />
       </main>
