@@ -9,11 +9,12 @@ const MONTHS: Record<string, number> = {
   januar: 1, 'január': 1, februar: 2, 'február': 2, marcius: 3, 'március': 3,
   aprilis: 4, 'április': 4, majus: 5, 'május': 5, junius: 6, 'június': 6,
   julius: 7, 'július': 7, augusztus: 8, szeptember: 9, oktober: 10, 'október': 10,
-  // DE
+  // DE (august/september/oktober share EN/HU keys after NFD)
   marz: 3, 'märz': 3, mai: 5, juni: 6, juli: 7, dezember: 12,
-  // FR
+  // FR (mai shares DE key)
   janvier: 1, fevrier: 2, 'février': 2, mars: 3, avril: 4, juin: 6,
-  juillet: 7, aout: 8, 'août': 8, octobre: 10, decembre: 12, 'décembre': 12,
+  juillet: 7, aout: 8, 'août': 8, septembre: 9, octobre: 10,
+  novembre: 11, decembre: 12, 'décembre': 12,
   // ES
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
   julio: 7, agosto: 8, septiembre: 9, setiembre: 9, noviembre: 11, diciembre: 12,
@@ -72,8 +73,8 @@ export function parseDate(raw: string | null | undefined): IsoDate | null {
     if (mo) return iso(+m[1], mo, +m[3]);
   }
 
-  // 15 mars 2026 / 15 lipca 2026
-  m = s.match(/^(\d{1,2})\s+([A-Za-zÀ-öø-ÿŐőŰű]+)\s+(\d{4})$/i);
+  // 18. August 2026 / 15 mars 2026 / 15 lipca 2026 (optional day-dot)
+  m = s.match(/^(\d{1,2})\.?\s+([A-Za-zÀ-öø-ÿŐőŰű]+)\s+(\d{4})$/i);
   if (m) {
     const mo = monthFromName(m[2]);
     if (mo) return iso(+m[3], mo, +m[1]);
@@ -84,6 +85,17 @@ export function parseDate(raw: string | null | undefined): IsoDate | null {
   if (m) {
     const mo = monthFromName(m[1]);
     if (mo) return iso(+m[3], mo, +m[2]);
+  }
+
+  // 15.08.2026 (already covered) / trailing junk after date on same token
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})\b/);
+  if (m) {
+    const a = +m[1];
+    const b = +m[2];
+    const y = +m[3];
+    if (a > 12) return iso(y, b, a);
+    if (b > 12) return iso(y, a, b);
+    return iso(y, b, a);
   }
 
   return null;
@@ -100,7 +112,7 @@ export function findDateAfter(text: string, labelRegex: RegExp): IsoDate | null 
   const from = m.index + m[0].length;
   const window = text.slice(from, from + 80);
   const candidates = window.match(
-    /\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\.?|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\.?|\d{4}\.?\s+[A-Za-zÀ-öø-ÿŐőŰű]+\s+\d{1,2}\.?|[A-Za-zÀ-öø-ÿ]+\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+[A-Za-zÀ-öø-ÿŐőŰű]+\s+\d{4}/g,
+    /\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\.?|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\.?|\d{4}\.?\s+[A-Za-zÀ-öø-ÿŐőŰű]+\s+\d{1,2}\.?|[A-Za-zÀ-öø-ÿ]+\s+\d{1,2},?\s+\d{4}|\d{1,2}\.?\s+[A-Za-zÀ-öø-ÿŐőŰű]+\s+\d{4}/g,
   );
   if (!candidates) return null;
   for (const c of candidates) {

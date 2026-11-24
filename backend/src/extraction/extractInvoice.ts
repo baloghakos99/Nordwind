@@ -9,8 +9,9 @@ import { findDateAfter, parseDate } from './parseDate.js';
 import { isNordwindName, isNordwindTaxId, normalizeTaxId } from './nordwind.js';
 import { isGenericPartyName } from './validate.js';
 
+// Same-line only after factura/fattura (no \\n), else "FACTURA\\nNº de…" swallows the label.
 const INVOICE_NO_LABEL_TOKEN =
-  '(?:sz[aá]mlasz[aá]m|rechnungsnummer|rechnungsnr\\.?|invoice\\s*no\\.?|invoice\\s*number|n[°ºo]\\s*de\\s*facture|factura\\s*n[°º.]?|fattura\\s*n[°º.]?|numer\\s*faktury)';
+  '(?:sz[aá]mlasz[aá]m|rechnungsnummer|rechnungsnr\\.?|invoice\\s*no\\.?|invoice\\s*number|n[°ºo]\\s*de\\s*factur[ae]|factura[^\\S\\n]*n[°ºo.]|fattura[^\\S\\n]*n[°ºo.]|numer\\s*faktury)';
 
 const INVOICE_NO_LABELS = new RegExp(`${INVOICE_NO_LABEL_TOKEN}\\s*[:.]?\\s*`, 'i');
 
@@ -21,26 +22,34 @@ const INVOICE_NO_LABEL_AGAIN = new RegExp(
 );
 
 const ISSUE_LABELS =
-  /(?:ki[aá]ll[ií]t[aá]s\s*d[aá]tuma|rechnungsdatum|invoice\s*date|date\s*de\s*facture|fecha\s*de\s*factura|data\s*fattura|data\s*wystawienia)\s*[:.]?\s*/i;
+  /(?:ki[aá]ll[ií]t[aá]s\s*d[aá]tuma|rechnungsdatum|invoice\s*date|date\s*de\s*facture|fecha\s*de\s*(?:factura|emisi[oó]n)|data\s*fattura|data\s*wystawienia)\s*[:.]?\s*/i;
 
 const FULFILLMENT_LABELS =
-  /(?:teljes[ií]t[eé]s\s*d[aá]tuma|leistungsdatum|date\s*of\s*supply|delivery\s*date|fulfillment\s*date|date\s*de\s*livraison|fecha\s*de\s*entrega|data\s*di\s*consegna|data\s*sprzeda[zż]y)\s*[:.]?\s*/i;
+  /(?:teljes[ií]t[eé]s\s*d[aá]tuma|leistungsdatum|date\s*of\s*supply|delivery\s*date|fulfillment\s*date|date\s*de\s*livraison|date\s*de\s*prestation|fecha\s*de\s*(?:entrega|operaci[oó]n)|data\s*di\s*consegna|data\s*prestazione|data\s*sprzeda[zż]y)\s*[:.]?\s*/i;
 
 const DUE_LABELS =
-  /(?:fizet[eé]si\s*hat[aá]rid[oő]|zahlbar\s*bis|f[aä]lligkeits?datum|due\s*date|date\s*d['’]?[eé]ch[eé]ance|fecha\s*de\s*vencimiento|scadenza|termin\s*p[lł]atno[sś]ci)\s*[:.]?\s*/i;
+  /(?:fizet[eé]si\s*hat[aá]rid[oő]|zahlbar\s*bis|f[aä]lligkeits?datum|due\s*date|date\s*d['’]?[eé]ch[eé]ance|fecha\s*de\s*vencimiento|data\s*scadenza|scadenza|termin\s*p[lł]atno[sś]ci)\s*[:.]?\s*/i;
 
+// Avoid bare "Total" (matches Total TVA → 0). Prefer explicit payable labels.
 const GROSS_LABELS =
-  /(?:fizetend[oő]\s*[öo]sszesen|rechnungsbetrag|total\s*due|amount\s*due|grand\s*total|brutt[oó]|total\s*ttc|importe\s*total|totale\s*documento|do\s*zap[lł]aty|total\s*(?:amount|gross)?)\s*[:.]?\s*/i;
+  /(?:fizetend[oő]\s*[öo]sszesen|rechnungsbetrag|total\s*due|amount\s*due|grand\s*total|brutt[oó]|net\s*[àa]\s*payer(?:\s*ttc)?|total\s*ttc|total\s*a\s*pagar|importe\s*total|totale\s*documento|do\s*zap[lł]aty|total\s+(?:amount|gross))\s*[:.]?\s*/i;
 
 const CURRENCY_LABELS = /(?:p[eé]nznem|w[aä]hrung|currency|devise|moneda|valuta)\s*[:.]?\s*/i;
 
 // No trailing \b: JS word-boundary breaks on accented letters (e.g. Vevő).
 const BUYER_SECTION =
-  /(?:vev(?:ő|ö|o)|bill\s*to|rechnungsempf(?:ä|a)nger|client(?:e)?|nabywca|sold\s*to)(?=\s|:|$)/i;
+  /(?:vev(?:ő|ö|o)|bill\s*to|rechnungsempf(?:ä|a)nger|factur[eé]\s*[àa]|cessionario|committente|destinatario|client(?:e)?|nabywca|sold\s*to)(?=\s|:|\/|$)/i;
 
 const EU_VAT_RE = /\b([A-Z]{2})\s*([A-Z0-9]{8,12})\b/g;
 const HU_TAX_RE = /\b(\d{8}-\d-\d{2})\b/g;
 const EIN_RE = /\bEIN\s*(\d{2}-\d{7})\b/i;
+
+/**
+ * HU + foreign legal forms (Bt., KG, s.r.o., …).
+ * Keep short tokens (ag/kg/ab) as whole words only.
+ */
+const COMPANY_FORM_RE =
+  /\b(?:kft|bt|kkt|zrt|nyrt|e\.?\s*v\.?|gmbh|ag|kg|ohg|gbr|ug|e\.?\s*k\.?|inc\.?|ltd\.?|llc|plc|corp\.?|co\.?|s\.r\.[lo]\.?|s\.l\.?|sp\.\s*z\s*o\.?o\.?|sarl|s\.a\.?s?\.?|s\.p\.a\.?|spa|bv|nv|ab|oy|as|aps)\b\.?/i;
 
 function valueAfterLabel(text: string, labelRe: RegExp): string | null {
   const m = text.match(labelRe);
@@ -68,10 +77,13 @@ function extractInvoiceNumber(text: string): string | null {
   if (labeled) {
     const cleaned = stripChainedInvoiceLabels(labeled);
     const token = cleaned.split(/\s{2,}|\s(?=[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű]{3,})/)[0].trim();
-    if (token && /[A-Za-z0-9]/.test(token)) return token.replace(/[,\s]+$/, '');
+    // Reject crumbs like "de" from a bad label match; fall through to pattern fallback
+    if (token && /[A-Za-z0-9]/.test(token) && token.replace(/[^A-Za-z0-9]/g, '').length >= 3) {
+      return token.replace(/[,\s]+$/, '');
+    }
   }
   const invLine = text.match(
-    /\b(NWS[\/\-]\d{4}[\/\-]\d+|INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+)\b/i,
+    /\b(NWS[\/\-]\d{4}[\/\-]\d+|FAC-\d{4}-\d+|F\d{4}-\d+|INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+|KT-\d{4}\/\d+)\b/i,
   );
   return invLine ? invLine[1] : null;
 }
@@ -135,7 +147,7 @@ function companyNameNear(text: string, index: number, direction: 'before' = 'bef
     for (let i = lineIdx; i >= Math.max(0, lineIdx - 6); i--) {
       const l = lines[i].trim();
       if (!l || skip.test(l) || /^\d/.test(l) || isGenericPartyName(l)) continue;
-      if (/kft|gmbh|inc\.|ltd|llc|s\.r\.o|zrt|nyrt|plc|corp|sarl|s\.a\./i.test(l) || l === l.toUpperCase()) {
+      if (COMPANY_FORM_RE.test(l) || l === l.toUpperCase()) {
         return l;
       }
     }
@@ -153,9 +165,11 @@ function splitParties(text: string): Parties {
   const buyerTaxes = collectTaxIds(buyerBlock);
   const allTaxes = collectTaxIds(text);
 
-  let issuerTax = headerTaxes.find((t) => !isNordwindTaxId(t.raw)) || headerTaxes[0] || null;
+  let issuerTax: TaxIdHit | null =
+    headerTaxes.find((t) => !isNordwindTaxId(t.raw)) || headerTaxes[0] || null;
   // Prefer Nordwind in buyer block when present (incoming); else first buyer-block tax
-  let buyerTax = buyerTaxes.find((t) => isNordwindTaxId(t.raw))
+  let buyerTax: TaxIdHit | null =
+    buyerTaxes.find((t) => isNordwindTaxId(t.raw))
     || buyerTaxes.find((t) => !isNordwindTaxId(t.raw))
     || buyerTaxes[0]
     || null;
@@ -180,7 +194,7 @@ function splitParties(text: string): Parties {
     if (INVOICE_NO_LABELS.test(l)) continue;
     if (BUYER_SECTION.test(l)) break;
     if (
-      /kft|gmbh|inc\.|ltd|llc|zrt|nyrt|plc|corp|sarl|s\.a\./i.test(l)
+      COMPANY_FORM_RE.test(l)
       || (l.length > 5 && l === l.toUpperCase() && /[A-Z]/.test(l) && !isGenericPartyName(l))
     ) {
       issuerName = l;
@@ -201,7 +215,7 @@ function splitParties(text: string): Parties {
   for (const l of buyerLines.slice(0, 10)) {
     if (BUYER_SECTION.test(l)) continue;
     if (isGenericPartyName(l)) continue;
-    if (/tax|vat|adó|steuer|ust|k[oö]z[oö]ss|ungarn|hungary|magyarorsz|egyesült|united\s*kingdom|infopark|\d{4}\s|company\s*no/i.test(l)) continue;
+    if (/tax|vat|adó|steuer|ust|partita\s*iva|tva\s*intracom|nif-?iva|k[oö]z[oö]ss|ungarn|hungary|magyarorsz|hungr[ií]a|italia|italy|france|hongrie|egyesült|united\s*kingdom|infopark|\d{4}\s|company\s*no|siret|descrizione|d[eé]signation|concepto|imponibile|prezzo|q\.?\s*t[aà]/i.test(l)) continue;
     if (/^\d/.test(l) || parseDate(l)) continue;
     if (l.length > 3) {
       buyerName = l;

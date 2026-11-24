@@ -14,6 +14,16 @@ describe('parseDate', () => {
     assert.equal(parseDate('27.10.2026'), '2026-10-27');
     assert.equal(parseDate('11.12.2026'), '2026-12-11');
   });
+  it('parses DE day-dot + month name', () => {
+    assert.equal(parseDate('18. August 2026'), '2026-08-18');
+    assert.equal(parseDate('14. August 2026'), '2026-08-14');
+    assert.equal(parseDate('17. September 2026'), '2026-09-17');
+  });
+  it('parses FR month names', () => {
+    assert.equal(parseDate('13 novembre 2026'), '2026-11-13');
+    assert.equal(parseDate('11 novembre 2026'), '2026-11-11');
+    assert.equal(parseDate('28 décembre 2026'), '2026-12-28');
+  });
   it('parses EN month name', () => {
     assert.equal(parseDate('May 1, 2026'), '2026-05-01');
     assert.equal(parseDate('April 30, 2026'), '2026-04-30');
@@ -105,6 +115,132 @@ Due date: May 16, 2026
 Currency: USD
 Total due $889.09`;
 
+/** ES incoming — Nº de factura / emisión / operación / TOTAL A PAGAR */
+const ES_FAC = `FACTURA
+Nº de factura: FAC-2026-0224
+SOLUCIONES IBÉRICAS S.L.
+Calle de Alcalá 145, 3º B, 28009 Madrid
+NIF-IVA ESB86473921
+Cliente
+NORDWIND SOLUTIONS KFT.
+Infopark sétány 7.
+1117 Budapest
+Hungría
+Nº de identificación fiscal: 26481937-2-43
+NIF-IVA: HU26481937
+Fecha de emisión
+18/08/2026
+Fecha de operación
+17/08/2026
+Moneda
+EUR
+Fecha de vencimiento
+17/10/2026
+TOTAL A PAGAR
+3.305,10 €`;
+
+/** FR outgoing NWS — Facturé à / Net à payer TTC / prestation */
+const FR_NWS = `FACTURE
+N° de facture: NWS/2026/0039
+NORDWIND SOLUTIONS KFT.
+Infopark sétány 7., 1117 Budapest
+N° TVA intracom. HU26481937
+Facturé à
+LUMIÈRE CONSEIL SARL
+18 rue de la République
+69002 Lyon
+France
+N° TVA intracom.: FR47829461375
+Date de facture
+11/09/2026
+Date de prestation
+05/09/2026
+Devise
+EUR
+Date d'échéance
+26/09/2026
+Net à payer TTC
+11 353,00 €`;
+
+/** FR incoming — month names + Net à payer */
+const FR_IN = `Lumière Conseil SARL
+18 rue de la République · 69002 Lyon · France
+N° TVA intracom.: FR47829461375
+F A C T U R E
+Facturé à
+Nordwind Solutions Kft.
+Infopark sétány 7.
+1117 Budapest
+Hongrie
+Identifiant fiscal: 26481937-2-43
+N° TVA intracom.: HU26481937
+N° de facture: F2026-0158
+Date de facture: 13 novembre 2026
+Date de prestation: 11 novembre 2026
+Date d'échéance: 28 décembre 2026
+Devise: EUR
+Net à payer TTC: 8 130,00 €`;
+
+/** Italian outgoing NWS — Cessionario / Data prestazione */
+const IT_NWS = `FATTURA
+Fattura n.: NWS/2026/0045
+NORDWIND SOLUTIONS KFT.
+Infopark sétány 7., 1117 Budapest
+Partita IVA HU26481937
+Cessionario / Committente
+OFFICINA ROMANO S.R.L.
+Via Giuseppe Garibaldi 27
+10122 Torino
+Italia
+Partita IVA: IT09583720018
+Data fattura
+04/11/2026
+Data prestazione
+31/10/2026
+Valuta
+EUR
+Data scadenza
+04/12/2026
+TOTALE DOCUMENTO
+13.910,00 €`;
+
+/** AT KG + German month names with day-dot */
+const AT_KG = `Hoffmann & Söhne KG
+Mariahilfer Straße 112 · 1070 Wien · Österreich
+USt-IdNr.: ATU58392716
+R E C H N U N G
+Rechnungsempfänger
+Nordwind Solutions Kft.
+Infopark sétány 7.
+1117 Budapest
+Ungarn
+Steuernummer: 26481937-2-43
+USt-IdNr.: HU26481937
+Rechnungsnummer: 2026-0588
+Rechnungsdatum: 18. August 2026
+Leistungsdatum: 14. August 2026
+Zahlbar bis: 17. September 2026
+Währung: EUR
+Rechnungsbetrag: 6.902,00 €`;
+
+/** HU Bt. issuer — company form was missing from regex → null issuer_name */
+const KT_BT = `Kovács és Társa Könyvelőiroda Bt.
+Bajcsy-Zsilinszky út 33. · 1065 Budapest · Magyarország
+Adószám: 21847502-1-42 · Közösségi adószám: HU21847502
+S Z Á M L A
+Vevő
+Nordwind Solutions Kft.
+Infopark sétány 7.
+1117 Budapest
+Adószám: 26481937-2-43
+Közösségi adószám: HU26481937
+Számlaszám: KT-2026/038
+Kiállítás dátuma: 2026.08.05.
+Teljesítés dátuma: 2026.07.31.
+Fizetési határidő: 2026.08.13.
+Pénznem: HUF
+Fizetendő összesen: 418 592 Ft`;
+
 /** Bilingual Nordwind outgoing (NWS) — previously failed rules → LLM */
 const NWS_OUT = `SZÁMLA / INVOICE
 Számlaszám / Invoice No.: NWS/2026/0044
@@ -168,6 +304,91 @@ describe('extractInvoiceFromText', () => {
     assert.ok(f.issuer_name);
     assert.match(f.issuer_name, /Atlas/i);
     assert.ok(validateExtraction(f).ok);
+  });
+
+  it('extracts Spanish incoming (emisión / TOTAL A PAGAR)', () => {
+    const f = extractInvoiceFromText(ES_FAC);
+    assert.equal(f.invoice_number, 'FAC-2026-0224');
+    assert.equal(f.direction, 'incoming');
+    assert.equal(f.currency, 'EUR');
+    assert.equal(f.gross_amount, 3305.1);
+    assert.equal(f.issue_date, '2026-08-18');
+    assert.equal(f.fulfillment_date, '2026-08-17');
+    assert.equal(f.due_date, '2026-10-17');
+    assert.match(String(f.issuer_name), /IB[EÉ]RICAS|SOLUCIONES/i);
+    assert.match(String(f.buyer_name), /Nordwind/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
+
+  it('extracts French outgoing NWS (Facturé à / Net à payer)', () => {
+    const f = extractInvoiceFromText(FR_NWS);
+    assert.equal(f.invoice_number, 'NWS/2026/0039');
+    assert.equal(f.direction, 'outgoing');
+    assert.equal(f.currency, 'EUR');
+    assert.equal(f.gross_amount, 11353);
+    assert.equal(f.issue_date, '2026-09-11');
+    assert.equal(f.fulfillment_date, '2026-09-05');
+    assert.equal(f.due_date, '2026-09-26');
+    assert.match(String(f.buyer_name), /Lumi[eè]re|CONSEIL/i);
+    assert.match(String(f.partner_name), /Lumi[eè]re|CONSEIL/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
+
+  it('extracts French incoming with month names', () => {
+    const f = extractInvoiceFromText(FR_IN);
+    assert.equal(f.invoice_number, 'F2026-0158');
+    assert.equal(f.direction, 'incoming');
+    assert.equal(f.currency, 'EUR');
+    assert.equal(f.gross_amount, 8130);
+    assert.equal(f.issue_date, '2026-11-13');
+    assert.equal(f.fulfillment_date, '2026-11-11');
+    assert.equal(f.due_date, '2026-12-28');
+    assert.match(String(f.issuer_name), /Lumi[eè]re/i);
+    assert.match(String(f.buyer_name), /Nordwind/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
+
+  it('extracts Italian outgoing NWS (Cessionario / prestazione)', () => {
+    const f = extractInvoiceFromText(IT_NWS);
+    assert.equal(f.invoice_number, 'NWS/2026/0045');
+    assert.equal(f.direction, 'outgoing');
+    assert.equal(f.currency, 'EUR');
+    assert.equal(f.gross_amount, 13910);
+    assert.equal(f.issue_date, '2026-11-04');
+    assert.equal(f.fulfillment_date, '2026-10-31');
+    assert.equal(f.due_date, '2026-12-04');
+    assert.match(String(f.issuer_name), /Nordwind/i);
+    assert.match(String(f.buyer_name), /OFFICINA|ROMANO/i);
+    assert.match(String(f.partner_name), /OFFICINA|ROMANO/i);
+    assert.ok(f.issuer_tax_id && /26481937/i.test(f.issuer_tax_id));
+    assert.ok(f.buyer_tax_id && /^IT/i.test(f.buyer_tax_id));
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
+
+  it('extracts Austrian KG with DE month-name dates', () => {
+    const f = extractInvoiceFromText(AT_KG);
+    assert.equal(f.invoice_number, '2026-0588');
+    assert.equal(f.direction, 'incoming');
+    assert.equal(f.currency, 'EUR');
+    assert.equal(f.gross_amount, 6902);
+    assert.equal(f.issue_date, '2026-08-18');
+    assert.equal(f.fulfillment_date, '2026-08-14');
+    assert.equal(f.due_date, '2026-09-17');
+    assert.match(String(f.issuer_name), /Hoffmann/i);
+    assert.match(String(f.partner_name), /Hoffmann/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
+  });
+
+  it('extracts HU Bt. issuer (KT) without LLM', () => {
+    const f = extractInvoiceFromText(KT_BT);
+    assert.equal(f.invoice_number, 'KT-2026/038');
+    assert.equal(f.direction, 'incoming');
+    assert.equal(f.currency, 'HUF');
+    assert.equal(f.gross_amount, 418592);
+    assert.match(String(f.issuer_name), /Kovács|Konyvel/i);
+    assert.match(String(f.partner_name), /Kovács|Konyvel/i);
+    assert.match(String(f.buyer_name), /Nordwind/i);
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
   });
 
   it('extracts bilingual Nordwind outgoing (NWS) without LLM', () => {

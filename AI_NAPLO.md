@@ -166,4 +166,19 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 10:17–10:50 – Rules hardening: EU sablonok (cégforma, dátum, IT/FR/ES)
+
+### Prompt
+> Több LLM-re eső számla sorozatban: KT Bt., AT Rechnung (KG + `18. August`), IT fattura (Cessionario), FR facture-ök, ES factura — erősítsd / pótold a rule-okat, ne LLM-re küldje őket.
+
+### Agent válasz / döntés
+- **Cégforma** (`COMPANY_FORM_RE`): HU `bt|kkt|e.v.` + külföldi `kg|ohg|gbr|ug|s.r.l.|S.L.|bv|nv|…`
+- **Dátum**: DE nap-pont (`18. August 2026`); FR hónapok (`septembre`, `novembre`)
+- **IT**: buyer `cessionario|committente|destinatario`; `data prestazione` / `data scadenza`
+- **FR**: buyer `Facturé à`; `date de prestation`; bruttó `Net à payer TTC` (bare `Total` kiszedve → ne TVA 0)
+- **ES**: `Nº de factura` (factura+n csak ugyanazon a soron); `fecha de emisión` / `operación`; `total a pagar`; `FAC-…` fallback
+- Fixture + valós PDF-ek → rules validáció OK (nem kell LLM)
+
+---
+
 
