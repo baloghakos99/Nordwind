@@ -105,6 +105,30 @@ Due date: May 16, 2026
 Currency: USD
 Total due $889.09`;
 
+/** Bilingual Nordwind outgoing (NWS) — previously failed rules → LLM */
+const NWS_OUT = `SZÁMLA / INVOICE
+Számlaszám / Invoice No.: NWS/2026/0044
+NORDWIND SOLUTIONS KFT.
+Infopark sétány 7., 1117 Budapest
+Közösségi adószám / VAT No. HU26481937
+Vevő / Bill to
+GREENFIELD ANALYTICS LTD.
+22 Brushfield Street
+London E1 6AN
+Egyesült Királyság
+Közösségi adószám / VAT No.: GB284719356
+Company No. 11842093
+Kiállítás dátuma / Invoice date
+2026.10.15.
+Teljesítés dátuma / Date of supply
+2026.10.14.
+Pénznem / Currency
+GBP
+Fizetési határidő / Due date
+2026.10.30.
+Fizetendő összesen / Total due
+8 743,00 GBP`;
+
 describe('extractInvoiceFromText', () => {
   it('extracts Hungarian incoming invoice', () => {
     const f = extractInvoiceFromText(HU);
@@ -144,5 +168,23 @@ describe('extractInvoiceFromText', () => {
     assert.ok(f.issuer_name);
     assert.match(f.issuer_name, /Atlas/i);
     assert.ok(validateExtraction(f).ok);
+  });
+
+  it('extracts bilingual Nordwind outgoing (NWS) without LLM', () => {
+    const f = extractInvoiceFromText(NWS_OUT);
+    assert.equal(f.invoice_number, 'NWS/2026/0044');
+    assert.equal(f.direction, 'outgoing');
+    assert.equal(f.currency, 'GBP');
+    assert.equal(f.gross_amount, 8743);
+    assert.equal(f.issue_date, '2026-10-15');
+    assert.equal(f.fulfillment_date, '2026-10-14');
+    assert.equal(f.due_date, '2026-10-30');
+    assert.match(String(f.issuer_name), /Nordwind/i);
+    assert.match(String(f.buyer_name), /GREENFIELD/i);
+    assert.match(String(f.partner_name), /GREENFIELD/i);
+    assert.ok(f.issuer_tax_id && /26481937/i.test(f.issuer_tax_id));
+    assert.ok(f.buyer_tax_id && /^GB/i.test(f.buyer_tax_id));
+    assert.notEqual(f.buyer_tax_id, 'GREENFIELD');
+    assert.ok(validateExtraction(f).ok, JSON.stringify(validateExtraction(f)));
   });
 });

@@ -7,9 +7,18 @@ import type {
 import { findAmountNear, detectCurrency, parseAmount } from './parseAmount.js';
 import { findDateAfter, parseDate } from './parseDate.js';
 import { isNordwindName, isNordwindTaxId, normalizeTaxId } from './nordwind.js';
+import { isGenericPartyName } from './validate.js';
 
-const INVOICE_NO_LABELS =
-  /(?:sz[aá]mlasz[aá]m|rechnungsnummer|rechnungsnr\.?|invoice\s*no\.?|invoice\s*number|n[°ºo]\s*de\s*facture|factura\s*n[°º.]?|fattura\s*n[°º.]?|numer\s*faktury)\s*[:.]?\s*/i;
+const INVOICE_NO_LABEL_TOKEN =
+  '(?:sz[aá]mlasz[aá]m|rechnungsnummer|rechnungsnr\\.?|invoice\\s*no\\.?|invoice\\s*number|n[°ºo]\\s*de\\s*facture|factura\\s*n[°º.]?|fattura\\s*n[°º.]?|numer\\s*faktury)';
+
+const INVOICE_NO_LABELS = new RegExp(`${INVOICE_NO_LABEL_TOKEN}\\s*[:.]?\\s*`, 'i');
+
+/** Residual second-language label after the first match (e.g. "/ Invoice No.:"). */
+const INVOICE_NO_LABEL_AGAIN = new RegExp(
+  `^(?:\\/\\s*)?${INVOICE_NO_LABEL_TOKEN}\\s*[:.]?\\s*`,
+  'i',
+);
 
 const ISSUE_LABELS =
   /(?:ki[aá]ll[ií]t[aá]s\s*d[aá]tuma|rechnungsdatum|invoice\s*date|date\s*de\s*facture|fecha\s*de\s*factura|data\s*fattura|data\s*wystawienia)\s*[:.]?\s*/i;
@@ -43,13 +52,27 @@ function valueAfterLabel(text: string, labelRe: RegExp): string | null {
   return next ? next.trim() : null;
 }
 
+/** Peel bilingual leftovers: "Számlaszám" match leaves "/ Invoice No.: NWS/…". */
+function stripChainedInvoiceLabels(raw: string): string {
+  let cur = raw.trim();
+  for (let i = 0; i < 4; i++) {
+    const next = cur.replace(INVOICE_NO_LABEL_AGAIN, '').replace(/^\/\s*/, '').trim();
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
 function extractInvoiceNumber(text: string): string | null {
   const labeled = valueAfterLabel(text, INVOICE_NO_LABELS);
   if (labeled) {
-    const token = labeled.split(/\s{2,}|\s(?=[A-Za-z]{3,})/)[0].trim();
-    if (token) return token.replace(/[,\s]+$/, '');
+    const cleaned = stripChainedInvoiceLabels(labeled);
+    const token = cleaned.split(/\s{2,}|\s(?=[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű]{3,})/)[0].trim();
+    if (token && /[A-Za-z0-9]/.test(token)) return token.replace(/[,\s]+$/, '');
   }
-  const invLine = text.match(/\b(INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+)\b/i);
+  const invLine = text.match(
+    /\b(NWS[\/\-]\d{4}[\/\-]\d+|INV-[A-Z0-9\-]+|RE-\d{4}-\d+|PI-\d{2}-\d+)\b/i,
+  );
   return invLine ? invLine[1] : null;
 }
 
@@ -72,6 +95,8 @@ function collectTaxIds(text: string): TaxIdHit[] {
   }
   for (const m of text.matchAll(EU_VAT_RE)) {
     if (m.index == null) continue;
+    // Reject false positives like GREENFIELD → GR + EENFIELD (no digits)
+    if (!/\d/.test(m[2])) continue;
     const raw = `${m[1]}${m[2]}`;
     const norm = normalizeTaxId(raw);
     if (!norm) continue;
@@ -109,7 +134,7 @@ function companyNameNear(text: string, index: number, direction: 'before' = 'bef
   if (direction === 'before') {
     for (let i = lineIdx; i >= Math.max(0, lineIdx - 6); i--) {
       const l = lines[i].trim();
-      if (!l || skip.test(l) || /^\d/.test(l)) continue;
+      if (!l || skip.test(l) || /^\d/.test(l) || isGenericPartyName(l)) continue;
       if (/kft|gmbh|inc\.|ltd|llc|s\.r\.o|zrt|nyrt|plc|corp|sarl|s\.a\./i.test(l) || l === l.toUpperCase()) {
         return l;
       }
@@ -129,10 +154,15 @@ function splitParties(text: string): Parties {
   const allTaxes = collectTaxIds(text);
 
   let issuerTax = headerTaxes.find((t) => !isNordwindTaxId(t.raw)) || headerTaxes[0] || null;
+  // Prefer Nordwind in buyer block when present (incoming); else first buyer-block tax
   let buyerTax = buyerTaxes.find((t) => isNordwindTaxId(t.raw))
+    || buyerTaxes.find((t) => !isNordwindTaxId(t.raw))
     || buyerTaxes[0]
-    || allTaxes.find((t) => isNordwindTaxId(t.raw))
     || null;
+  // Incoming: Nordwind tax only appears after buyer section
+  if (!buyerTax && issuerTax && !isNordwindTaxId(issuerTax.raw)) {
+    buyerTax = allTaxes.find((t) => isNordwindTaxId(t.raw)) || null;
+  }
 
   // Atlas-style: EIN in header
   if (!issuerTax) {
@@ -145,34 +175,43 @@ function splitParties(text: string): Parties {
 
   let issuerName: string | null = null;
   const firstLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  for (const l of firstLines.slice(0, 8)) {
-    if (/^(számla|rechnung|invoice|factura|fattura|faktura)$/i.test(l)) continue;
+  for (const l of firstLines.slice(0, 10)) {
+    if (isGenericPartyName(l)) continue;
     if (INVOICE_NO_LABELS.test(l)) continue;
-    if (/kft|gmbh|inc\.|ltd|llc|zrt/i.test(l) || (l.length > 5 && l === l.toUpperCase() && /[A-Z]/.test(l))) {
-      if (!isNordwindName(l)) {
-        issuerName = l;
-        break;
-      }
+    if (BUYER_SECTION.test(l)) break;
+    if (
+      /kft|gmbh|inc\.|ltd|llc|zrt|nyrt|plc|corp|sarl|s\.a\./i.test(l)
+      || (l.length > 5 && l === l.toUpperCase() && /[A-Z]/.test(l) && !isGenericPartyName(l))
+    ) {
+      issuerName = l;
+      break;
     }
   }
   if (!issuerName && issuerTax) {
     issuerName = companyNameNear(text, issuerTax.index, 'before');
+  }
+  // Header Nordwind tax + no other company → we are the issuer (outgoing NWS)
+  if (!issuerName && issuerTax && isNordwindTaxId(issuerTax.raw)) {
+    const nwLine = firstLines.find((l) => isNordwindName(l));
+    if (nwLine) issuerName = nwLine;
   }
 
   let buyerName: string | null = null;
   const buyerLines = buyerBlock.split('\n').map((l) => l.trim()).filter(Boolean);
   for (const l of buyerLines.slice(0, 10)) {
     if (BUYER_SECTION.test(l)) continue;
-    if (/tax|vat|adó|steuer|ust|k[oö]z[oö]ss|ungarn|hungary|magyarorsz|infopark|\d{4}\s/i.test(l)) continue;
+    if (isGenericPartyName(l)) continue;
+    if (/tax|vat|adó|steuer|ust|k[oö]z[oö]ss|ungarn|hungary|magyarorsz|egyesült|united\s*kingdom|infopark|\d{4}\s|company\s*no/i.test(l)) continue;
     if (/^\d/.test(l) || parseDate(l)) continue;
     if (l.length > 3) {
       buyerName = l;
       break;
     }
   }
-  if (!buyerName || !isNordwindName(buyerName)) {
+  // Incoming fallback only: missing buyer, and Nordwind is not already the issuer
+  if (!buyerName && !isNordwindName(issuerName)) {
     const nwLine = text.split('\n').map((l) => l.trim()).find((l) => isNordwindName(l));
-    if (nwLine && !isNordwindName(issuerName)) buyerName = nwLine;
+    if (nwLine) buyerName = nwLine;
   }
 
   return {

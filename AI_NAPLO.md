@@ -154,4 +154,16 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 10:04 – Rules fix: bilingual NWS outgoing
+
+### Prompt
+> Az ilyen fajta (NWS kétnyelvű) számlák LLM-re futnak — nézd meg miért, majd javítsuk a rule-okat.
+
+### Agent válasz / döntés
+- Gyökér: bilingual label → `invoice_number=/`; cím (`SZÁMLA / INVOICE`) mint issuer; buyer-fallback felülírta Nordwindra; `GREENFIELD` false EU-VAT.
+- Javítások: chained invoice-label strip + `NWS/…` fallback; doc-title skip (`isGenericPartyName`); Nordwind lehet issuer; buyer-fallback csak ha hiányzik a vevő; EU-VAT csak ha van számjegy a törzsben.
+- Fixture + valós PDF: `outgoing`, rules validáció OK (nem kell LLM).
+
+---
+
 

@@ -28,7 +28,8 @@ const GENERIC_NAME_RE =
 const ADDRESS_LIKE_RE =
   /^(infopark|budapest|hungary|magyarország|ungarn|strasse|straße|street|avenue|út|u\.|hrsz)/i;
 
-function isGenericPartyName(name: string | null | undefined): boolean {
+/** Document titles / address lines mistaken for party names (shared with rules). */
+export function isGenericPartyName(name: string | null | undefined): boolean {
   if (!name) return false;
   const n = name.trim().replace(/\s+/g, ' ');
   if (n.length < 3) return true;
