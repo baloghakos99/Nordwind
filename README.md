@@ -89,5 +89,6 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 - OCR / image PDF támogatás.
 - Confidence / „review” státusz: LLM sikerült, de soft check gyenge → manuális megerősítés, ne azonnal `error`.
 - CSV / Excel export (partner mátrix, számlalista); diagram hónap-tartomány szűrő.
+- Kimutatásoknál, szűrés időszakra
 
 Részletes terv: `PLANNING.md`. AI napló: `AI_NAPLO.md`.
