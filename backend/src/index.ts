@@ -12,6 +12,7 @@ import './paths.js';
 import invoicesRouter from './routes/invoices.js';
 import reportRouter from './routes/report.js';
 import type { HealthResponse } from './types/api.js';
+import { getProcessConcurrency } from './util/concurrency.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -27,6 +28,7 @@ app.get('/api/health', (_req, res) => {
     service: 'nordwind',
     invoices: row.c,
     llm: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+    llm_concurrency: getProcessConcurrency(),
   };
   res.json(body);
 });
@@ -48,6 +50,7 @@ if (fs.existsSync(frontendDist)) {
 
 app.listen(PORT, () => {
   console.log(`Nordwind listening on http://0.0.0.0:${PORT}`);
+  console.log(`Process concurrency (LLM_CONCURRENCY): ${getProcessConcurrency()}`);
   if (!process.env.OPENROUTER_API_KEY?.trim()) {
     console.warn('OPENROUTER_API_KEY missing — LLM fallback disabled');
   }

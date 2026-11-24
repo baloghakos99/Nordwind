@@ -11,6 +11,7 @@ services:
       DATA_DIR: /data
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      LLM_CONCURRENCY: ${LLM_CONCURRENCY:-3}
     volumes:
       - nordwind-data:/data
 

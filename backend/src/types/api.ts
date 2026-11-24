@@ -52,6 +52,7 @@ export interface HealthResponse {
   service: 'nordwind';
   invoices: number;
   llm: boolean;
+  llm_concurrency: number;
 }
 
 export interface ProcessResult {

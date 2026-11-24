@@ -7,6 +7,7 @@ import type { ProcessResult } from '../types/api.js';
 import type { ExtractionMethod } from '../types/domain.js';
 import type { ExtractedInvoiceFields, InvoiceRow } from '../types/invoice.js';
 import type { FxConversionResult } from '../types/mnb.js';
+import { getProcessConcurrency, mapPool } from '../util/concurrency.js';
 import { extractInvoiceFromText } from './extractInvoice.js';
 import { extractInvoiceWithLlm, isLlmConfigured } from './llmExtract.js';
 import { extractPdfText } from './pdfText.js';
@@ -328,24 +329,23 @@ let queueRunning = false;
 export async function processPendingInvoices(): Promise<{
   skipped?: boolean;
   processed?: number;
+  concurrency?: number;
   results?: ProcessResult[];
 }> {
   if (queueRunning) return { skipped: true };
   queueRunning = true;
-  const results: ProcessResult[] = [];
+  const concurrency = getProcessConcurrency();
   try {
     const ids = [
       ...listPending.all().map((r) => r.id),
       ...listFxBackfill.all().map((r) => r.id),
     ];
     const unique = [...new Set(ids)];
-    for (const id of unique) {
-      results.push(await processInvoiceById(id));
-    }
+    const results = await mapPool(unique, concurrency, (id) => processInvoiceById(id));
+    return { processed: results.length, concurrency, results };
   } finally {
     queueRunning = false;
   }
-  return { processed: results.length, results };
 }
 
 export function scheduleProcessPending(): void {

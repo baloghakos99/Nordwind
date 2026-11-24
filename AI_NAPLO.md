@@ -143,4 +143,15 @@ A 7. pont kötelezően kéri az AI-asszisztált fejlesztés dokumentálását. A
 
 ---
 
+## 2026-11-24 09:51 – LLM / process concurrency (2. lépés)
+
+### Prompt
+> A progress poll után jöhet a párhuzamos számlafeldolgozás — `LLM_CONCURRENCY` env-nel korlátozott worker pool (ne sorban egyenként menjen a tömeges LLM fallback).
+
+### Agent válasz / döntés
+- `LLM_CONCURRENCY` env (alap **3**, min 1, max 16) — worker pool a pending / FX-backfill számlákra (`mapPool`).
+- Egy queue futás továbbra is egyidejű (ne induljon két teljes batch); a batchen belül N párhuzamos `processInvoiceById` (rules + LLM + FX).
+
+---
+
 

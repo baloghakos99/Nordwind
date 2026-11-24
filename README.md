@@ -55,6 +55,7 @@ Együtt fut a backend (`tsx --watch`) és a frontend (Vite) a gyökér `concurre
 2. **LLM tartalék** (csak ha a validáció elbukik): OpenRouter (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`).
    - Már `done` számlát nem küldjük újra.
    - A listában látszik: *szabályok alapján* / *LLM tartalék*.
+   - Párhuzamos feldolgozás: `LLM_CONCURRENCY` (alap 3) — egyszerre ennyi számla (rules/LLM/FX).
 
 ### MNB árfolyam (Phase 4)
 
